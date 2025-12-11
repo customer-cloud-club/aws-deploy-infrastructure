@@ -1,0 +1,95 @@
+# =============================================================================
+# terraform.tfvars - アプリケーション設定ファイル
+# =============================================================================
+#
+# このファイルをコピーして terraform.tfvars を作成してください:
+#   cp terraform.tfvars.example terraform.tfvars
+#
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 基本設定
+# -----------------------------------------------------------------------------
+project_name = "my-ai-app"       # プロジェクト名（英数字、ハイフンのみ）
+environment  = "dev"             # 環境: dev, staging, prod
+aws_region   = "ap-northeast-1"  # AWSリージョン
+
+# -----------------------------------------------------------------------------
+# サービス定義
+# -----------------------------------------------------------------------------
+# 各サービス（web, api, worker等）を定義します
+# - port = 0 の場合はロードバランサーに接続されません（バックグラウンドワーカー用）
+# - path_pattern で ALB のルーティングルールを設定します
+# - priority は低い数字が優先されます（1-50000）
+
+services = {
+  # フロントエンド (Next.js, React, Vue等)
+  web = {
+    image         = "805673386383.dkr.ecr.ap-northeast-1.amazonaws.com/my-ai-app-dev/web:latest"
+    port          = 3000
+    cpu           = 256   # 0.25 vCPU
+    memory        = 512   # 512 MB
+    desired_count = 1
+    health_check  = "/health"
+    path_pattern  = ["/*"]  # デフォルトルート
+    priority      = 100     # 最も低い優先度（他のルールが優先）
+    environment = {
+      NODE_ENV    = "production"
+      API_URL     = "http://localhost/api"
+    }
+    command = []
+  }
+
+  # バックエンドAPI (FastAPI, Express, Go等)
+  api = {
+    image         = "805673386383.dkr.ecr.ap-northeast-1.amazonaws.com/my-ai-app-dev/api:latest"
+    port          = 8080
+    cpu           = 512   # 0.5 vCPU
+    memory        = 1024  # 1 GB
+    desired_count = 2
+    health_check  = "/api/health"
+    path_pattern  = ["/api/*"]
+    priority      = 10
+    environment = {
+      ENV           = "production"
+      DATABASE_URL  = "postgresql://..."  # Secrets Manager推奨
+    }
+    command = []
+  }
+
+  # バックグラウンドワーカー (Celery, Bull等) - オプション
+  # worker = {
+  #   image         = "805673386383.dkr.ecr.ap-northeast-1.amazonaws.com/my-ai-app-dev/worker:latest"
+  #   port          = 0     # ロードバランサーに接続しない
+  #   cpu           = 256
+  #   memory        = 512
+  #   desired_count = 1
+  #   health_check  = ""
+  #   path_pattern  = []
+  #   priority      = 0
+  #   environment = {
+  #     REDIS_URL = "redis://..."
+  #   }
+  #   command = ["celery", "-A", "tasks", "worker", "--loglevel=info"]
+  # }
+}
+
+# -----------------------------------------------------------------------------
+# データベース設定（オプション）
+# -----------------------------------------------------------------------------
+database_enabled        = false           # true で RDS を作成
+database_engine         = "postgres"      # postgres または mysql
+database_instance_class = "db.t3.micro"   # インスタンスサイズ
+
+# -----------------------------------------------------------------------------
+# ストレージ設定（オプション）
+# -----------------------------------------------------------------------------
+storage_enabled = false                   # true で S3 バケットを作成
+storage_buckets = ["uploads", "assets"]   # 作成するバケット名
+
+# -----------------------------------------------------------------------------
+# HTTPS設定（オプション）
+# -----------------------------------------------------------------------------
+# ACM で証明書を作成し、ARN を設定すると HTTPS が有効になります
+certificate_arn = ""
+# certificate_arn = "arn:aws:acm:ap-northeast-1:123456789012:certificate/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"

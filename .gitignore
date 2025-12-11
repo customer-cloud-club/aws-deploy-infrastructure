@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# OS files
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# Environment
+.env
+.env.local
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+!*.tfvars.example
+
+# Logs
+*.log
+aws-deploy-infrastructure
