@@ -264,6 +264,7 @@ aws-deploy-infrastructure/
 ## ドキュメント
 
 - [共通認証・課金基盤 要件定義書](docs/AUTH_BILLING_REQUIREMENTS.md) - 認証・決済基盤の詳細仕様
+- [Deploy Architect エージェント要件定義書](docs/DEPLOY_ARCHITECT_REQUIREMENTS.md) - 自動デプロイエージェントの仕様
 - [インフラ要件定義書](docs/REQUIREMENTS.md)
 - [デプロイガイド](docs/DEPLOY_GUIDE.md)
 
