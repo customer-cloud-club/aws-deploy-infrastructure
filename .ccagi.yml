@@ -1,0 +1,10 @@
+# CCAGI Configuration
+version: "1.0"
+project:
+  name: "aws-deploy-infrastructure"
+
+external_dependencies:
+  anthropic_api: enabled
+  github_api: enabled
+  aws_api: disabled
+  external_npm: disabled

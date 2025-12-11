@@ -1,0 +1,16 @@
+{
+  "agentStatus": "idle",
+  "agentType": "CCAGIAgent",
+  "config": {
+    "externalDependencies": {
+      "anthropic_api": true,
+      "github_api": true,
+      "aws_api": false,
+      "external_npm": false
+    }
+  },
+  "system": {
+    "name": "CCAGI",
+    "version": "1.0.0"
+  }
+}
