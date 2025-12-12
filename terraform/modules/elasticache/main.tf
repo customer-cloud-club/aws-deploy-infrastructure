@@ -149,7 +149,7 @@ resource "aws_elasticache_replication_group" "main" {
   tags = {
     Name        = "${local.name_prefix}-redis"
     Environment = var.environment
-    Purpose     = "Rate limiting, entitlement cache, session cache"
+    Purpose     = "Rate-limiting/entitlement-cache/session-cache"
   }
 
   lifecycle {

@@ -173,16 +173,19 @@ data "aws_iam_policy_document" "secrets_access" {
     ]
   }
 
-  statement {
-    sid    = "AllowKMSDecrypt"
-    effect = "Allow"
+  dynamic "statement" {
+    for_each = var.kms_key_arn != null ? [1] : []
+    content {
+      sid    = "AllowKMSDecrypt"
+      effect = "Allow"
 
-    actions = [
-      "kms:Decrypt",
-      "kms:DescribeKey"
-    ]
+      actions = [
+        "kms:Decrypt",
+        "kms:DescribeKey"
+      ]
 
-    resources = var.kms_key_arn != null ? [var.kms_key_arn] : []
+      resources = [var.kms_key_arn]
+    }
   }
 }
 

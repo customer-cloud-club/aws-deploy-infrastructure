@@ -256,17 +256,23 @@ module "api_gateway" {
   enable_waf            = true
 
   lambda_function_arns = {
+    auth             = module.lambda.auth_pre_signup_arn  # TODO: Replace with dedicated auth Lambda
     me_entitlements  = module.lambda.entitlement_check_arn
     me_usage         = module.lambda.usage_recorder_arn
     checkout         = module.lambda.checkout_handler_arn
+    subscriptions    = module.lambda.checkout_handler_arn  # TODO: Replace with dedicated subscriptions Lambda
+    catalog          = module.lambda.entitlement_check_arn  # TODO: Replace with dedicated catalog Lambda
     stripe_webhook   = module.lambda.webhook_processor_arn
     admin            = module.lambda.admin_api_arn
   }
 
   lambda_function_names = {
+    auth             = module.lambda.auth_pre_signup_name  # TODO: Replace with dedicated auth Lambda
     me_entitlements  = module.lambda.entitlement_check_name
     me_usage         = module.lambda.usage_recorder_name
     checkout         = module.lambda.checkout_handler_name
+    subscriptions    = module.lambda.checkout_handler_name  # TODO: Replace with dedicated subscriptions Lambda
+    catalog          = module.lambda.entitlement_check_name  # TODO: Replace with dedicated catalog Lambda
     stripe_webhook   = module.lambda.webhook_processor_name
     admin            = module.lambda.admin_api_name
   }
@@ -291,8 +297,10 @@ module "cloudfront" {
 
   origins = [
     {
-      domain_name = replace(module.api_gateway.api_endpoint, "https://", "")
+      # Extract only the domain name (remove https:// and /stage path)
+      domain_name = split("/", replace(module.api_gateway.api_endpoint, "https://", ""))[0]
       origin_id   = "api-gateway"
+      origin_path = "/${module.api_gateway.stage_name}"
       custom_origin_config = {
         http_port              = 80
         https_port             = 443
@@ -304,7 +312,13 @@ module "cloudfront" {
   default_origin_id = "api-gateway"
 
   cognito_user_pool_id = module.cognito.user_pool_id
-  web_acl_id           = module.waf.web_acl_arn
+
+  # WAF for CloudFront requires CLOUDFRONT scope (not REGIONAL)
+  # Disable WAF for dev CloudFront - API Gateway still protected by regional WAF
+  web_acl_id = null
+
+  # Disable Lambda@Edge auth in dev (requires SSM-based config for production)
+  enable_auth = false
 
   price_class = var.cloudfront_price_class
   enable_ipv6 = var.cloudfront_enable_ipv6

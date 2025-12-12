@@ -199,15 +199,16 @@ output "log_groups" {
 
 # ---------------------------------------------------------
 # Provisioned Concurrency Configuration
+# NOTE: Currently disabled - requires published Lambda version
 # ---------------------------------------------------------
-output "entitlement_provisioned_concurrency" {
-  description = "Provisioned concurrency configuration for entitlement-check function"
-  value = {
-    function_name = aws_lambda_provisioned_concurrency_config.entitlement.function_name
-    qualifier     = aws_lambda_provisioned_concurrency_config.entitlement.qualifier
-    executions    = aws_lambda_provisioned_concurrency_config.entitlement.provisioned_concurrent_executions
-  }
-}
+# output "entitlement_provisioned_concurrency" {
+#   description = "Provisioned concurrency configuration for entitlement-check function"
+#   value = {
+#     function_name = aws_lambda_provisioned_concurrency_config.entitlement.function_name
+#     qualifier     = aws_lambda_provisioned_concurrency_config.entitlement.qualifier
+#     executions    = aws_lambda_provisioned_concurrency_config.entitlement.provisioned_concurrent_executions
+#   }
+# }
 
 # ---------------------------------------------------------
 # All Functions Summary (for convenience)
@@ -220,57 +221,48 @@ output "lambda_functions" {
       name         = aws_lambda_function.auth_pre_signup.function_name
       invoke_arn   = aws_lambda_function.auth_pre_signup.invoke_arn
       vpc_enabled  = false
-      concurrency  = 50
     }
     auth_post_confirmation = {
       arn          = aws_lambda_function.auth_post_confirmation.arn
       name         = aws_lambda_function.auth_post_confirmation.function_name
       invoke_arn   = aws_lambda_function.auth_post_confirmation.invoke_arn
       vpc_enabled  = true
-      concurrency  = 50
     }
     auth_pre_token = {
       arn          = aws_lambda_function.auth_pre_token.arn
       name         = aws_lambda_function.auth_pre_token.function_name
       invoke_arn   = aws_lambda_function.auth_pre_token.invoke_arn
       vpc_enabled  = true
-      concurrency  = 100
     }
     entitlement_check = {
       arn                      = aws_lambda_function.entitlement_check.arn
       name                     = aws_lambda_function.entitlement_check.function_name
       invoke_arn               = aws_lambda_function.entitlement_check.invoke_arn
       vpc_enabled              = true
-      concurrency              = 500
-      provisioned_concurrency  = var.entitlement_provisioned_concurrency
     }
     usage_recorder = {
       arn          = aws_lambda_function.usage_recorder.arn
       name         = aws_lambda_function.usage_recorder.function_name
       invoke_arn   = aws_lambda_function.usage_recorder.invoke_arn
       vpc_enabled  = true
-      concurrency  = 100
     }
     webhook_processor = {
       arn          = aws_lambda_function.webhook_processor.arn
       name         = aws_lambda_function.webhook_processor.function_name
       invoke_arn   = aws_lambda_function.webhook_processor.invoke_arn
       vpc_enabled  = true
-      concurrency  = 100
     }
     checkout_handler = {
       arn          = aws_lambda_function.checkout_handler.arn
       name         = aws_lambda_function.checkout_handler.function_name
       invoke_arn   = aws_lambda_function.checkout_handler.invoke_arn
       vpc_enabled  = true
-      concurrency  = 50
     }
     admin_api = {
       arn          = aws_lambda_function.admin_api.arn
       name         = aws_lambda_function.admin_api.function_name
       invoke_arn   = aws_lambda_function.admin_api.invoke_arn
       vpc_enabled  = true
-      concurrency  = 50
     }
   }
 }

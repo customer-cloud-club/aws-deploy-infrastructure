@@ -58,6 +58,10 @@ resource "aws_s3_bucket_lifecycle_configuration" "audit_log" {
     id     = "archive-old-logs"
     status = "Enabled"
 
+    filter {
+      prefix = ""
+    }
+
     # GLACIER移行
     transition {
       days          = var.audit_log_glacier_transition_days
@@ -80,6 +84,10 @@ resource "aws_s3_bucket_lifecycle_configuration" "audit_log" {
     id     = "cleanup-old-noncurrent-versions"
     status = "Enabled"
 
+    filter {
+      prefix = ""
+    }
+
     # 非カレントバージョンの管理
     noncurrent_version_transition {
       noncurrent_days = 30
@@ -87,7 +95,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "audit_log" {
     }
 
     noncurrent_version_transition {
-      noncurrent_days = 90
+      noncurrent_days = 180
       storage_class   = "DEEP_ARCHIVE"
     }
 

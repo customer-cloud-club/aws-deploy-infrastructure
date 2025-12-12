@@ -150,7 +150,7 @@ resource "aws_wafv2_web_acl" "main" {
 
 resource "aws_cloudwatch_log_group" "waf_logs" {
   count             = var.enable_logging ? 1 : 0
-  name              = "/aws/wafv2/${var.project_name}-${var.environment}"
+  name              = "aws-waf-logs-${var.project_name}-${var.environment}"
   retention_in_days = var.log_retention_days
 
   tags = merge(

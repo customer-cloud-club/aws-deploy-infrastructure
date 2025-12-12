@@ -61,8 +61,6 @@ resource "aws_lambda_function" "auth_pre_signup" {
   filename         = var.lambda_zip_path
   source_code_hash = filebase64sha256(var.lambda_zip_path)
 
-  reserved_concurrent_executions = 50
-
   environment {
     variables = {
       ENVIRONMENT = var.environment
@@ -105,8 +103,6 @@ resource "aws_lambda_function" "auth_post_confirmation" {
 
   filename         = var.lambda_zip_path
   source_code_hash = filebase64sha256(var.lambda_zip_path)
-
-  reserved_concurrent_executions = 50
 
   vpc_config {
     subnet_ids         = var.private_subnet_ids
@@ -158,8 +154,6 @@ resource "aws_lambda_function" "auth_pre_token" {
 
   filename         = var.lambda_zip_path
   source_code_hash = filebase64sha256(var.lambda_zip_path)
-
-  reserved_concurrent_executions = 100
 
   vpc_config {
     subnet_ids         = var.private_subnet_ids
@@ -214,8 +208,6 @@ resource "aws_lambda_function" "entitlement_check" {
   filename         = var.lambda_zip_path
   source_code_hash = filebase64sha256(var.lambda_zip_path)
 
-  reserved_concurrent_executions = 500
-
   vpc_config {
     subnet_ids         = var.private_subnet_ids
     security_group_ids = [aws_security_group.lambda.id]
@@ -254,14 +246,19 @@ resource "aws_lambda_alias" "entitlement_check_live" {
   function_version = "$LATEST"
 }
 
-# Provisioned Concurrency for critical high-traffic function
-resource "aws_lambda_provisioned_concurrency_config" "entitlement" {
-  function_name                     = aws_lambda_function.entitlement_check.function_name
-  qualifier                         = aws_lambda_alias.entitlement_check_live.name
-  provisioned_concurrent_executions = var.entitlement_provisioned_concurrency
-
-  depends_on = [aws_lambda_alias.entitlement_check_live]
-}
+# NOTE: Provisioned Concurrency requires a published version, not $LATEST
+# To enable provisioned concurrency:
+# 1. Publish a version: aws_lambda_function.entitlement_check with publish = true
+# 2. Update the alias to use the published version
+# 3. Uncomment the provisioned concurrency config below
+#
+# resource "aws_lambda_provisioned_concurrency_config" "entitlement" {
+#   function_name                     = aws_lambda_function.entitlement_check.function_name
+#   qualifier                         = aws_lambda_alias.entitlement_check_live.name
+#   provisioned_concurrent_executions = var.entitlement_provisioned_concurrency
+#
+#   depends_on = [aws_lambda_alias.entitlement_check_live]
+# }
 
 # ---------------------------------------------------------
 # Lambda Function: usage-recorder
@@ -277,8 +274,6 @@ resource "aws_lambda_function" "usage_recorder" {
 
   filename         = var.lambda_zip_path
   source_code_hash = filebase64sha256(var.lambda_zip_path)
-
-  reserved_concurrent_executions = 100
 
   vpc_config {
     subnet_ids         = var.private_subnet_ids
@@ -333,8 +328,6 @@ resource "aws_lambda_function" "webhook_processor" {
   filename         = var.lambda_zip_path
   source_code_hash = filebase64sha256(var.lambda_zip_path)
 
-  reserved_concurrent_executions = 100
-
   vpc_config {
     subnet_ids         = var.private_subnet_ids
     security_group_ids = [aws_security_group.lambda.id]
@@ -388,8 +381,6 @@ resource "aws_lambda_function" "checkout_handler" {
   filename         = var.lambda_zip_path
   source_code_hash = filebase64sha256(var.lambda_zip_path)
 
-  reserved_concurrent_executions = 50
-
   vpc_config {
     subnet_ids         = var.private_subnet_ids
     security_group_ids = [aws_security_group.lambda.id]
@@ -442,8 +433,6 @@ resource "aws_lambda_function" "admin_api" {
 
   filename         = var.lambda_zip_path
   source_code_hash = filebase64sha256(var.lambda_zip_path)
-
-  reserved_concurrent_executions = 50
 
   vpc_config {
     subnet_ids         = var.private_subnet_ids

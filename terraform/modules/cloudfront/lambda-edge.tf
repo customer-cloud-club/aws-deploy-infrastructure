@@ -131,16 +131,9 @@ resource "aws_lambda_function" "auth_verifier" {
   filename         = data.archive_file.lambda_edge[0].output_path
   source_code_hash = data.archive_file.lambda_edge[0].output_base64sha256
 
-  environment {
-    variables = {
-      COGNITO_REGION     = var.cognito_region
-      COGNITO_USER_POOL_ID = var.cognito_user_pool_id
-      COGNITO_JWKS_URL   = "https://cognito-idp.${var.cognito_region}.amazonaws.com/${var.cognito_user_pool_id}/.well-known/jwks.json"
-      COGNITO_ISSUER     = "https://cognito-idp.${var.cognito_region}.amazonaws.com/${var.cognito_user_pool_id}"
-      LOGIN_URL          = var.login_url
-      JWT_SECRET         = var.jwt_secret
-    }
-  }
+  # Lambda@Edge cannot have environment variables
+  # Configuration is passed via SSM Parameter Store instead
+  # See aws_ssm_parameter.cognito_jwks_url and aws_ssm_parameter.cognito_issuer
 
   tags = merge(
     var.tags,

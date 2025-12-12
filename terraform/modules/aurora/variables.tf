@@ -58,7 +58,7 @@ variable "master_password" {
 variable "engine_version" {
   description = "Aurora PostgreSQL engine version"
   type        = string
-  default     = "15.4"
+  default     = "15.8"
 }
 
 # Serverless v2 Scaling Configuration
