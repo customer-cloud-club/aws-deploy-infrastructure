@@ -1,7 +1,7 @@
 # 共通認証・課金基盤 要件定義書
 
-**バージョン:** 1.2
-**最終更新:** 2025-12-11
+**バージョン:** 1.3
+**最終更新:** 2025-12-12
 **ステータス:** ドラフト
 
 ---
@@ -63,7 +63,11 @@
 
 - **クラウド:** AWS
 - **リージョン:** ap-northeast-1（東京）
-- **アーキテクチャ:** サーバーレス寄せ（API Gateway + Lambda + DynamoDB を基本）
+- **アーキテクチャ:** サーバーレス + マネージドRDB（API Gateway + Lambda + Aurora PostgreSQL を基本）
+- **データベース:** Amazon Aurora PostgreSQL Serverless v2
+  - 自動スケーリング（0.5〜16 ACU）
+  - リードレプリカによる読み取り分散
+  - 自動フェイルオーバー（マルチAZ）
 - **IaC:** Terraform必須（構築・変更はTerraform経由で行う）
 
 ### 3.2 DR（災害復旧）
@@ -135,8 +139,15 @@
 │          └─────────────────┼─────────────────┼─────────────────┘           │
 │                            ▼                 ▼                              │
 │                     ┌─────────────┐   ┌─────────────┐                      │
-│                     │  DynamoDB   │   │   Stripe    │                      │
+│                     │   Aurora    │   │   Stripe    │                      │
+│                     │ PostgreSQL  │   │             │                      │
+│                     │ Serverless  │   │             │                      │
 │                     └─────────────┘   └─────────────┘                      │
+│                            │                                                │
+│                     ┌─────────────┐                                        │
+│                     │   ElastiCache│  ← レート制限・セッションキャッシュ     │
+│                     │   (Redis)   │                                        │
+│                     └─────────────┘                                        │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -147,9 +158,11 @@
 | 1 | **認証基盤（Auth Service）** | Cognito User Pool（共通）、Hosted UI、SAML連携 |
 | 2 | **Catalog Service** | テナント、プロダクト、プラン定義の管理 |
 | 3 | **Entitlement Service** | 利用権管理、認可判定API |
-| 4 | **Billing Service** | 決済抽象レイヤー、Stripe連携、Webhook処理 |
+| 4 | **Billing Service** | 決済抽象レイヤー、Stripe連携、Webhook処理（冪等性保証） |
 | 5 | **End-user Portal** | エンドユーザー向けの契約・利用状況確認UI |
 | 6 | **Admin Console** | プラットフォーム管理者向けUI |
+| 7 | **Aurora PostgreSQL** | トランザクション処理、リレーショナルデータ管理 |
+| 8 | **ElastiCache (Redis)** | レート制限、セッションキャッシュ、Entitlementキャッシュ |
 
 ---
 
@@ -282,10 +295,102 @@
 |----|------|------|
 | BILL-001 | Checkout Session作成 | Stripe Checkout への遷移URL生成 |
 | BILL-002 | Subscription管理 | サブスクリプションの作成・更新・解約 |
-| BILL-003 | Webhook処理 | Stripe Webhook受信 → Entitlement更新 |
+| BILL-003 | Webhook処理 | Stripe Webhook受信 → Entitlement更新（冪等性保証） |
 | BILL-004 | 決済履歴 | ユーザーごとの決済履歴表示 |
 | BILL-005 | 請求書管理 | Stripe Invoiceとの連携 |
 | BILL-006 | プラン変更 | アップグレード / ダウングレード |
+
+#### 7.4.1 Webhook冪等性保証
+
+Stripeは同一イベントを複数回送信する可能性があるため、冪等性（Idempotency）を保証する仕組みを実装する。
+
+**冪等性保証の仕組み:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         Webhook Processing Flow                              │
+│                                                                             │
+│   Stripe → API Gateway → Lambda → PostgreSQL                                │
+│                                                                             │
+│   1. Webhook受信                                                             │
+│   2. stripe_event_id で processed_webhooks テーブルを検索                    │
+│   3. 既存レコードあり → 200 OK を即座に返却（処理スキップ）                    │
+│   4. 既存レコードなし → トランザクション開始                                  │
+│      4a. processed_webhooks に INSERT（UNIQUE制約）                          │
+│      4b. 本処理（Entitlement更新等）                                         │
+│      4c. COMMIT                                                              │
+│   5. 200 OK を返却                                                           │
+│                                                                             │
+│   ※ 4a で UNIQUE 違反 → 並行リクエストと判断し処理スキップ                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**processed_webhooks テーブル:**
+
+```sql
+CREATE TABLE processed_webhooks (
+    stripe_event_id VARCHAR(100) PRIMARY KEY,
+    event_type VARCHAR(100) NOT NULL,
+    processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    response_status INT,
+    processing_time_ms INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 古いレコードの自動削除（30日以上経過）
+CREATE INDEX idx_processed_webhooks_created_at ON processed_webhooks(created_at);
+```
+
+**Lambda実装例:**
+
+```typescript
+export const handler = async (event: APIGatewayProxyEvent) => {
+  const stripeEvent = JSON.parse(event.body!);
+  const eventId = stripeEvent.id;
+
+  // トランザクションで冪等性を保証
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 冪等性チェック（排他ロック付きINSERT）
+    const insertResult = await client.query(`
+      INSERT INTO processed_webhooks (stripe_event_id, event_type)
+      VALUES ($1, $2)
+      ON CONFLICT (stripe_event_id) DO NOTHING
+      RETURNING stripe_event_id
+    `, [eventId, stripeEvent.type]);
+
+    if (insertResult.rowCount === 0) {
+      // 既に処理済み → スキップ
+      await client.query('ROLLBACK');
+      return { statusCode: 200, body: 'Already processed' };
+    }
+
+    // 本処理（イベントタイプに応じた処理）
+    await processStripeEvent(client, stripeEvent);
+
+    await client.query('COMMIT');
+    return { statusCode: 200, body: 'Processed' };
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+```
+
+**対象Webhookイベント:**
+
+| イベント | 処理内容 | 冪等性対応 |
+|---------|---------|-----------|
+| `checkout.session.completed` | Entitlement作成 | UPSERT使用 |
+| `invoice.paid` | 決済履歴記録、期間延長 | payment_id重複チェック |
+| `invoice.payment_failed` | 決済失敗通知 | 通知履歴チェック |
+| `customer.subscription.updated` | プラン変更反映 | バージョン比較 |
+| `customer.subscription.deleted` | Entitlement停止 | ステータス確認 |
 
 **カード情報の取り扱い:**
 
@@ -409,7 +514,30 @@ await PlatformSDK.recordUsage(1)
 
 ## 9. データモデル
 
-### 9.1 主要テーブル
+### 9.1 データベース構成
+
+**採用DB:** Amazon Aurora PostgreSQL Serverless v2
+
+| 項目 | 設定 |
+|------|------|
+| エンジン | PostgreSQL 15.x |
+| インスタンスタイプ | Serverless v2 (0.5〜16 ACU) |
+| ストレージ | 自動拡張（最大128TB） |
+| マルチAZ | 有効（自動フェイルオーバー） |
+| リードレプリカ | 1台（読み取り負荷分散） |
+| 接続プーリング | RDS Proxy使用（Lambda接続最適化） |
+
+**Aurora選定理由:**
+
+| 観点 | DynamoDB | Aurora PostgreSQL | 採用理由 |
+|------|----------|-------------------|---------|
+| トランザクション | 制限あり | ACID完全対応 | 決済処理に必須 |
+| JOINクエリ | 不可 | 可能 | 分析・レポート生成 |
+| スキーマ変更 | 柔軟 | マイグレーション必要 | 要件が明確なため問題なし |
+| コスト（小規模） | 安い | やや高い | Serverless v2で最適化 |
+| 運用複雑度 | 低い | 中程度 | マネージドで軽減 |
+
+### 9.2 主要テーブル
 
 ```sql
 -- Tenants: テナント（会社）
@@ -542,7 +670,10 @@ CREATE TABLE payment_events (
 | 項目 | 要件 |
 |------|------|
 | EntitlementチェックAPI P95 | 200ms以下 |
-| 構成 | DynamoDB + Lambda（高頻度アクセス対応） |
+| Webhook処理 P95 | 500ms以下 |
+| 構成 | Aurora PostgreSQL + Lambda + RDS Proxy（高頻度アクセス対応） |
+| キャッシュ | Redis（Entitlement結果を60秒キャッシュ） |
+| DB接続 | RDS Proxy経由（コネクションプーリング） |
 
 ### 10.3 セキュリティ
 
@@ -570,9 +701,311 @@ CREATE TABLE payment_events (
 | 環境 | ステージング / 本番（同一構成、スケール調整可） |
 | デプロイ | CI/CDパイプラインで自動化 |
 
-### 10.6 多言語対応（i18n / L10n）
+### 10.6 レート制限・スロットリング対策
 
-#### 10.6.1 対応言語
+AWSサービスのスロットリング制限に抵触しないよう、多層的なレート制限を実装する。
+
+#### 10.6.1 AWSサービス制限と対策
+
+| サービス | デフォルト制限 | 対策 |
+|---------|--------------|------|
+| **API Gateway** | 10,000 req/sec（リージョン） | Usage Plan設定、バースト制限 |
+| **Lambda** | 1,000 同時実行（リージョン） | Reserved Concurrency、Provisioned |
+| **Cognito** | 認証: 120 req/sec/ユーザープール | キャッシュ、バックオフ |
+| **Aurora** | 接続数: ACU依存 | RDS Proxy、コネクションプーリング |
+| **Secrets Manager** | 10,000 req/sec | Lambda起動時にキャッシュ |
+
+#### 10.6.2 API レート制限設計
+
+**API Gateway Usage Plan:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         Rate Limiting Architecture                          │
+│                                                                             │
+│   Client → CloudFront → API Gateway → Lambda → Aurora                       │
+│                ↓              ↓          ↓                                  │
+│            WAF制限      Usage Plan   Redis制限                              │
+│         (IP単位DDoS)   (APIキー単位) (ユーザー単位)                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**エンドポイント別レート制限:**
+
+| エンドポイント | Rate Limit | Burst | 理由 |
+|---------------|-----------|-------|------|
+| `POST /auth/*` | 10 req/sec/IP | 20 | ブルートフォース対策 |
+| `GET /me/entitlements` | 100 req/sec/user | 200 | 高頻度アクセス想定 |
+| `POST /me/usage` | 50 req/sec/user | 100 | 使用量記録 |
+| `POST /webhooks/stripe` | 100 req/sec | 500 | Stripe からの一括送信対応 |
+| `GET /admin/*` | 50 req/sec/user | 100 | 管理画面 |
+| `POST /checkout` | 10 req/sec/user | 20 | 決済開始 |
+
+**API Gateway Usage Plan 設定:**
+
+```hcl
+# Terraform
+resource "aws_api_gateway_usage_plan" "standard" {
+  name = "standard-plan"
+
+  throttle_settings {
+    rate_limit  = 1000  # req/sec
+    burst_limit = 2000
+  }
+
+  quota_settings {
+    limit  = 100000  # リクエスト/月
+    period = "MONTH"
+  }
+}
+
+resource "aws_api_gateway_usage_plan" "premium" {
+  name = "premium-plan"
+
+  throttle_settings {
+    rate_limit  = 5000
+    burst_limit = 10000
+  }
+
+  quota_settings {
+    limit  = 1000000
+    period = "MONTH"
+  }
+}
+```
+
+#### 10.6.3 Redis によるユーザー単位レート制限
+
+**Sliding Window Log アルゴリズム実装:**
+
+```typescript
+import Redis from 'ioredis';
+
+const redis = new Redis(process.env.REDIS_URL);
+
+interface RateLimitResult {
+  allowed: boolean;
+  remaining: number;
+  resetAt: number;
+}
+
+export async function checkRateLimit(
+  userId: string,
+  endpoint: string,
+  limit: number,
+  windowMs: number
+): Promise<RateLimitResult> {
+  const key = `ratelimit:${endpoint}:${userId}`;
+  const now = Date.now();
+  const windowStart = now - windowMs;
+
+  // Lua スクリプトでアトミックに処理
+  const script = `
+    local key = KEYS[1]
+    local now = tonumber(ARGV[1])
+    local windowStart = tonumber(ARGV[2])
+    local limit = tonumber(ARGV[3])
+    local windowMs = tonumber(ARGV[4])
+
+    -- 古いエントリを削除
+    redis.call('ZREMRANGEBYSCORE', key, '-inf', windowStart)
+
+    -- 現在のカウント
+    local count = redis.call('ZCARD', key)
+
+    if count < limit then
+      -- 新しいリクエストを追加
+      redis.call('ZADD', key, now, now)
+      redis.call('PEXPIRE', key, windowMs)
+      return {1, limit - count - 1, now + windowMs}
+    else
+      return {0, 0, now + windowMs}
+    end
+  `;
+
+  const result = await redis.eval(
+    script, 1, key, now, windowStart, limit, windowMs
+  ) as [number, number, number];
+
+  return {
+    allowed: result[0] === 1,
+    remaining: result[1],
+    resetAt: result[2]
+  };
+}
+
+// 使用例
+export async function rateLimitMiddleware(req, res, next) {
+  const result = await checkRateLimit(
+    req.userId,
+    req.path,
+    100,  // 100 requests
+    60000 // per minute
+  );
+
+  res.setHeader('X-RateLimit-Limit', '100');
+  res.setHeader('X-RateLimit-Remaining', result.remaining.toString());
+  res.setHeader('X-RateLimit-Reset', result.resetAt.toString());
+
+  if (!result.allowed) {
+    return res.status(429).json({
+      error: 'Too Many Requests',
+      retryAfter: Math.ceil((result.resetAt - Date.now()) / 1000)
+    });
+  }
+
+  next();
+}
+```
+
+#### 10.6.4 Lambda 同時実行制限
+
+**Reserved Concurrency 設定:**
+
+| Lambda 関数 | Reserved Concurrency | 理由 |
+|------------|---------------------|------|
+| `entitlement-check` | 500 | 高頻度、優先度高 |
+| `webhook-processor` | 100 | Stripe からの一括処理 |
+| `auth-handler` | 200 | ログイン処理 |
+| `admin-api` | 50 | 管理画面、低頻度 |
+| `usage-recorder` | 100 | 使用量記録 |
+
+**Provisioned Concurrency（コールドスタート対策）:**
+
+```hcl
+resource "aws_lambda_provisioned_concurrency_config" "entitlement" {
+  function_name                     = aws_lambda_function.entitlement_check.function_name
+  qualifier                         = aws_lambda_alias.entitlement_live.name
+  provisioned_concurrent_executions = 10
+}
+```
+
+#### 10.6.5 Aurora 接続管理
+
+**RDS Proxy 設定:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         Connection Pooling                                   │
+│                                                                             │
+│   Lambda (多数のインスタンス)                                                │
+│          ↓                                                                   │
+│   RDS Proxy (コネクションプール)                                             │
+│   - max_connections_percent: 100                                            │
+│   - max_idle_connections_percent: 50                                        │
+│   - connection_borrow_timeout: 120s                                         │
+│          ↓                                                                   │
+│   Aurora PostgreSQL                                                          │
+│   - max_connections: 1000 (ACU依存で自動調整)                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**接続プール設定（Lambda側）:**
+
+```typescript
+import { Pool } from 'pg';
+
+// Lambda 外でプールを初期化（コネクション再利用）
+const pool = new Pool({
+  host: process.env.RDS_PROXY_ENDPOINT,
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  max: 1,  // Lambda インスタンスあたり1接続
+  idleTimeoutMillis: 120000,
+  connectionTimeoutMillis: 5000,
+});
+
+export const handler = async (event) => {
+  const client = await pool.connect();
+  try {
+    // クエリ実行
+  } finally {
+    client.release();
+  }
+};
+```
+
+#### 10.6.6 バックオフ・リトライ戦略
+
+**Exponential Backoff 実装:**
+
+```typescript
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelayMs: number = 100
+): Promise<T> {
+  let lastError: Error;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+
+      // スロットリングエラーの場合のみリトライ
+      if (!isThrottlingError(error)) {
+        throw error;
+      }
+
+      if (attempt < maxRetries) {
+        const delay = baseDelayMs * Math.pow(2, attempt) + Math.random() * 100;
+        await sleep(delay);
+      }
+    }
+  }
+
+  throw lastError;
+}
+
+function isThrottlingError(error: any): boolean {
+  const throttlingCodes = [
+    'ThrottlingException',
+    'ProvisionedThroughputExceededException',
+    'TooManyRequestsException',
+    'RequestLimitExceeded'
+  ];
+  return throttlingCodes.includes(error.code);
+}
+```
+
+#### 10.6.7 監視・アラート
+
+| メトリクス | 閾値 | アラート |
+|-----------|------|---------|
+| API Gateway 4XX | > 5% | Warning |
+| API Gateway 429 | > 1% | Critical |
+| Lambda Throttles | > 0 | Warning |
+| Lambda ConcurrentExecutions | > 80% | Warning |
+| Aurora Connections | > 80% | Warning |
+| Redis Memory | > 80% | Warning |
+
+**CloudWatch Alarm 設定例:**
+
+```hcl
+resource "aws_cloudwatch_metric_alarm" "api_throttle" {
+  alarm_name          = "api-gateway-throttle-alarm"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "Count"
+  namespace           = "AWS/ApiGateway"
+  period              = 60
+  statistic           = "Sum"
+  threshold           = 100
+  alarm_description   = "API Gateway throttling detected"
+
+  dimensions = {
+    ApiName = "auth-billing-api"
+  }
+
+  alarm_actions = [aws_sns_topic.alerts.arn]
+}
+```
+
+### 10.7 多言語対応（i18n / L10n）
+
+#### 10.7.1 対応言語
 
 世界中のユーザーが利用できるよう、以下の主要言語をサポートする。
 
@@ -600,7 +1033,7 @@ CREATE TABLE payment_events (
 - P2: 6ヶ月以内
 - P3: 1年以内（ユーザー需要に応じて）
 
-#### 10.6.2 言語検出・切り替え
+#### 10.7.2 言語検出・切り替え
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -626,7 +1059,7 @@ CREATE TABLE payment_events (
 - 切り替え時はページリロードなし（SPA対応）
 - 選択した言語は Cookie + DB に保存
 
-#### 10.6.3 翻訳対象
+#### 10.7.3 翻訳対象
 
 | カテゴリ | 対象 | 管理方法 |
 |---------|------|---------|
@@ -638,7 +1071,7 @@ CREATE TABLE payment_events (
 | **プロダクト説明** | 各プロダクトの説明文 | DB + 管理画面 |
 | **プラン名・説明** | 料金プランの内容 | DB + 管理画面 |
 
-#### 10.6.4 技術実装
+#### 10.7.4 技術実装
 
 **フロントエンド:**
 
@@ -701,7 +1134,7 @@ locales/
 }
 ```
 
-#### 10.6.5 ローカライゼーション（L10n）
+#### 10.7.5 ローカライゼーション（L10n）
 
 言語だけでなく、地域ごとの形式にも対応する。
 
@@ -728,7 +1161,7 @@ const formatCurrency = (amount: number, currency: string, locale: string) => {
 // 例: formatCurrency(1234.56, 'USD', 'en-US') → "$1,234.56"
 ```
 
-#### 10.6.6 RTL（右から左）対応
+#### 10.7.6 RTL（右から左）対応
 
 アラビア語など RTL 言語への対応。
 
@@ -757,7 +1190,7 @@ const formatCurrency = (amount: number, currency: string, locale: string) => {
 <html lang="ar" dir="rtl">
 ```
 
-#### 10.6.7 翻訳ワークフロー
+#### 10.7.7 翻訳ワークフロー
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -787,7 +1220,7 @@ const formatCurrency = (amount: number, currency: string, locale: string) => {
 | **Lokalise** | リアルタイムプレビュー、SDK |
 | **Phrase** | 大規模プロジェクト向け |
 
-#### 10.6.8 品質基準
+#### 10.7.8 品質基準
 
 | 項目 | 基準 |
 |------|------|
@@ -797,7 +1230,7 @@ const formatCurrency = (amount: number, currency: string, locale: string) => {
 | **文字数制限** | ボタン等はUI崩れ防止のため文字数ガイドライン設定 |
 | **禁止事項** | 機械翻訳のみでの本番リリース禁止 |
 
-#### 10.6.9 フォント対応
+#### 10.7.9 フォント対応
 
 | 言語 | フォント |
 |------|---------|
@@ -1209,13 +1642,17 @@ Design Notes:
 | カテゴリ | サービス | 用途 |
 |---------|---------|------|
 | 認証 | Cognito User Pool | ユーザー認証 |
-| API | API Gateway | REST API |
+| API | API Gateway | REST API、Usage Plan |
 | コンピュート | Lambda | ビジネスロジック |
-| データベース | DynamoDB | Entitlement等 |
+| データベース | Aurora PostgreSQL Serverless v2 | トランザクション処理、Entitlement等 |
+| DBプロキシ | RDS Proxy | Lambda接続プーリング |
+| キャッシュ | ElastiCache (Redis) | レート制限、セッションキャッシュ |
 | CDN | CloudFront | 認証ゲートウェイ |
+| エッジ処理 | Lambda@Edge | JWT検証 |
 | シークレット | Secrets Manager | Stripeキー等 |
 | ストレージ | S3 | 監査ログ保存 |
-| 監視 | CloudWatch | ログ / メトリクス |
+| 監視 | CloudWatch | ログ / メトリクス / アラート |
+| セキュリティ | WAF | DDoS対策、レート制限 |
 
 ### 14.2 Terraform ディレクトリ構成
 
@@ -1223,10 +1660,13 @@ Design Notes:
 terraform/
 ├── modules/
 │   ├── cognito/          # 認証基盤
-│   ├── api-gateway/      # API Gateway
+│   ├── api-gateway/      # API Gateway + Usage Plan
 │   ├── lambda/           # Lambda関数
-│   ├── dynamodb/         # DynamoDB
-│   ├── cloudfront/       # CloudFront + Function
+│   ├── aurora/           # Aurora PostgreSQL Serverless v2
+│   ├── rds-proxy/        # RDS Proxy
+│   ├── elasticache/      # ElastiCache (Redis)
+│   ├── cloudfront/       # CloudFront + Lambda@Edge
+│   ├── waf/              # WAF ルール
 │   └── s3/               # 監査ログ保存
 ├── envs/
 │   ├── dev/
@@ -1253,3 +1693,4 @@ terraform/
 | 1.0 | 2025-12-11 | Claude | 初版作成（議論内容を反映） |
 | 1.1 | 2025-12-11 | Claude | デザイン要件追加（Steve Jobs / Jony Ive原則） |
 | 1.2 | 2025-12-11 | Claude | 多言語対応（i18n）要件追加（15言語対応） |
+| 1.3 | 2025-12-12 | Claude | DynamoDB → Aurora PostgreSQL Serverless v2 に変更、Webhook冪等性保証追加、レート制限・スロットリング対策追加、RDS Proxy・ElastiCache追加 |
