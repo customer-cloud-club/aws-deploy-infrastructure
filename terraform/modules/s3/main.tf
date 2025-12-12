@@ -1,25 +1,6 @@
 # S3 Module - オブジェクトストレージ
 # アップロード、アセット保存用
 
-variable "project_name" {
-  type = string
-}
-
-variable "environment" {
-  type = string
-}
-
-variable "enabled" {
-  type    = bool
-  default = false
-}
-
-variable "buckets" {
-  type        = list(string)
-  default     = ["uploads", "assets"]
-  description = "List of bucket suffixes to create"
-}
-
 locals {
   name_prefix = "${var.project_name}-${var.environment}"
 }
@@ -108,13 +89,4 @@ resource "aws_s3_bucket_cors_configuration" "uploads" {
     expose_headers  = ["ETag"]
     max_age_seconds = 3000
   }
-}
-
-# Outputs
-output "bucket_names" {
-  value = var.enabled ? { for k, v in aws_s3_bucket.main : k => v.id } : {}
-}
-
-output "bucket_arns" {
-  value = var.enabled ? { for k, v in aws_s3_bucket.main : k => v.arn } : {}
 }

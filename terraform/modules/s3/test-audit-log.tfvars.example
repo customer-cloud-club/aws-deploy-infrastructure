@@ -1,0 +1,36 @@
+# S3 Audit Log Bucket - Test Configuration Example
+# このファイルをコピーして使用: cp test-audit-log.tfvars.example terraform.tfvars
+
+# 基本設定
+project_name = "myproject"
+environment  = "prod"
+
+# 汎用バケットは無効化
+enabled = false
+
+# 監査ログバケット有効化
+enable_audit_log = true
+
+# KMS CMK ARN（必須: 事前にKMSキーを作成してください）
+kms_key_arn = "arn:aws:kms:ap-northeast-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+
+# Object Lock設定（オプション）
+audit_log_retention_mode  = "GOVERNANCE" # または "COMPLIANCE"
+audit_log_retention_years = 10
+
+# ライフサイクル設定（オプション）
+audit_log_glacier_transition_days      = 90  # 90日後にGLACIER移行
+audit_log_deep_archive_transition_days = 365 # 1年後にDEEP_ARCHIVE移行
+
+# アクセスログ設定（オプション）
+enable_access_logging = false
+# enable_access_logging = true
+# access_log_bucket_id  = "myproject-access-logs-prod"
+
+# 共通タグ
+tags = {
+  ManagedBy  = "Terraform"
+  Project    = "MyProject"
+  Compliance = "commercial-law-10years"
+  Purpose    = "audit-log"
+}

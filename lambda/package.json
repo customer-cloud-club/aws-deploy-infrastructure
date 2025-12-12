@@ -1,0 +1,39 @@
+{
+  "name": "auth-billing-lambda",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint . --ext .ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "pg": "^8.11.0",
+    "ioredis": "^5.3.0",
+    "@aws-sdk/client-secrets-manager": "^3.400.0",
+    "stripe": "^14.0.0",
+    "jsonwebtoken": "^9.0.0",
+    "jwks-rsa": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/aws-lambda": "^8.10.0",
+    "@types/pg": "^8.10.0",
+    "@types/jsonwebtoken": "^9.0.0",
+    "typescript": "^5.0.0",
+    "esbuild": "^0.19.0",
+    "jest": "^29.0.0",
+    "@types/jest": "^29.0.0",
+    "ts-jest": "^29.0.0",
+    "eslint": "^8.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "name": "auth-verifier-edge",
+  "version": "1.0.0",
+  "description": "Lambda@Edge function for JWT authentication",
+  "main": "dist/handler.js",
+  "scripts": {
+    "build": "tsc",
+    "package": "npm run build && zip -j dist/function.zip dist/*",
+    "clean": "rm -rf dist node_modules"
+  },
+  "dependencies": {
+    "jsonwebtoken": "^9.0.2",
+    "jwks-rsa": "^3.1.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.145",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/node": "^20.11.5",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20.x"
+  }
+}

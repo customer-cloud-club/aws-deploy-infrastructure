@@ -22,3 +22,15 @@ node_modules/
 # Logs
 *.log
 aws-deploy-infrastructure
+
+# Miyabi Universe
+.universe/
+
+# Claude Code
+.claude/mcp-servers/
+.claude/mcp.json.backup
+
+# Lambda build artifacts
+lambda-functions/dist/
+lambda/dist/
+tfplan
