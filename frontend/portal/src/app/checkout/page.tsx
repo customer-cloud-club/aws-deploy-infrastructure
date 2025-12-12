@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckoutForm } from '@/components/billing/checkout-form'
 import { Button } from '@/components/ui/button'
@@ -8,12 +8,9 @@ import { ArrowLeft, Shield, CreditCard } from 'lucide-react'
 import Link from 'next/link'
 
 /**
- * Checkout Page
- *
- * Stripe Checkout integration for subscription payment.
- * Creates a Checkout Session and redirects to Stripe.
+ * Checkout Page Content
  */
-export default function CheckoutPage() {
+function CheckoutContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const planId = searchParams.get('plan')
@@ -100,5 +97,19 @@ export default function CheckoutPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * Checkout Page
+ *
+ * Stripe Checkout integration for subscription payment.
+ * Creates a Checkout Session and redirects to Stripe.
+ */
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+      <CheckoutContent />
+    </Suspense>
   )
 }

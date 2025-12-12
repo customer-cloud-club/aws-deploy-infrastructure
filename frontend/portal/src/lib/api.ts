@@ -19,13 +19,17 @@ async function apiRequest<T>(
   const session = await getAuthSession()
   const token = session?.tokens?.idToken?.toString()
 
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...options.headers,
   }
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`
+  }
+
+  // Merge with existing headers if any
+  if (options.headers) {
+    Object.assign(headers, options.headers)
   }
 
   const response = await fetch(`${API_URL}${endpoint}`, {
