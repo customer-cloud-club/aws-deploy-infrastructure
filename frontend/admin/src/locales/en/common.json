@@ -1,0 +1,102 @@
+{
+  "app": {
+    "title": "Miyabi Admin Console",
+    "description": "Admin Console"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "products": "Products",
+    "plans": "Plans",
+    "users": "Users",
+    "settings": "Settings"
+  },
+  "common": {
+    "search": "Search",
+    "filter": "Filter",
+    "add": "Add",
+    "edit": "Edit",
+    "delete": "Delete",
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "confirm": "Confirm",
+    "loading": "Loading...",
+    "noData": "No data available",
+    "error": "An error occurred",
+    "success": "Success"
+  },
+  "auth": {
+    "signIn": "Sign In",
+    "signOut": "Sign Out",
+    "email": "Email",
+    "password": "Password",
+    "forgotPassword": "Forgot Password?"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "kpi": {
+      "totalRevenue": "Total Revenue",
+      "activeUsers": "Active Users",
+      "totalProducts": "Total Products",
+      "conversionRate": "Conversion Rate"
+    },
+    "charts": {
+      "revenueOverTime": "Revenue Over Time",
+      "userGrowth": "User Growth",
+      "productUsage": "Product Usage"
+    }
+  },
+  "products": {
+    "title": "Products",
+    "addProduct": "Add Product",
+    "editProduct": "Edit Product",
+    "deleteProduct": "Delete Product",
+    "fields": {
+      "name": "Product Name",
+      "description": "Description",
+      "status": "Status",
+      "createdAt": "Created At",
+      "updatedAt": "Updated At"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive"
+    }
+  },
+  "plans": {
+    "title": "Plans",
+    "addPlan": "Add Plan",
+    "editPlan": "Edit Plan",
+    "deletePlan": "Delete Plan",
+    "fields": {
+      "name": "Plan Name",
+      "price": "Price",
+      "billing": "Billing Cycle",
+      "features": "Features",
+      "status": "Status"
+    },
+    "billing": {
+      "monthly": "Monthly",
+      "yearly": "Yearly"
+    }
+  },
+  "users": {
+    "title": "Users",
+    "addUser": "Add User",
+    "editUser": "Edit User",
+    "deleteUser": "Delete User",
+    "fields": {
+      "name": "Name",
+      "email": "Email",
+      "role": "Role",
+      "status": "Status",
+      "lastLogin": "Last Login",
+      "createdAt": "Created At"
+    },
+    "roles": {
+      "admin": "Admin",
+      "superAdmin": "Super Admin",
+      "user": "User"
+    }
+  }
+}

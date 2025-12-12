@@ -1,0 +1,102 @@
+{
+  "app": {
+    "title": "Miyabi Admin Console",
+    "description": "管理者コンソール"
+  },
+  "nav": {
+    "dashboard": "ダッシュボード",
+    "products": "プロダクト管理",
+    "plans": "プラン管理",
+    "users": "ユーザー管理",
+    "settings": "設定"
+  },
+  "common": {
+    "search": "検索",
+    "filter": "フィルター",
+    "add": "追加",
+    "edit": "編集",
+    "delete": "削除",
+    "save": "保存",
+    "cancel": "キャンセル",
+    "close": "閉じる",
+    "confirm": "確認",
+    "loading": "読み込み中...",
+    "noData": "データがありません",
+    "error": "エラーが発生しました",
+    "success": "成功しました"
+  },
+  "auth": {
+    "signIn": "サインイン",
+    "signOut": "サインアウト",
+    "email": "メールアドレス",
+    "password": "パスワード",
+    "forgotPassword": "パスワードを忘れた場合"
+  },
+  "dashboard": {
+    "title": "ダッシュボード",
+    "kpi": {
+      "totalRevenue": "総収益",
+      "activeUsers": "アクティブユーザー",
+      "totalProducts": "総プロダクト数",
+      "conversionRate": "コンバージョン率"
+    },
+    "charts": {
+      "revenueOverTime": "収益推移",
+      "userGrowth": "ユーザー成長",
+      "productUsage": "プロダクト利用状況"
+    }
+  },
+  "products": {
+    "title": "プロダクト管理",
+    "addProduct": "プロダクトを追加",
+    "editProduct": "プロダクトを編集",
+    "deleteProduct": "プロダクトを削除",
+    "fields": {
+      "name": "プロダクト名",
+      "description": "説明",
+      "status": "ステータス",
+      "createdAt": "作成日",
+      "updatedAt": "更新日"
+    },
+    "status": {
+      "active": "アクティブ",
+      "inactive": "非アクティブ"
+    }
+  },
+  "plans": {
+    "title": "プラン管理",
+    "addPlan": "プランを追加",
+    "editPlan": "プランを編集",
+    "deletePlan": "プランを削除",
+    "fields": {
+      "name": "プラン名",
+      "price": "価格",
+      "billing": "請求サイクル",
+      "features": "機能",
+      "status": "ステータス"
+    },
+    "billing": {
+      "monthly": "月額",
+      "yearly": "年額"
+    }
+  },
+  "users": {
+    "title": "ユーザー管理",
+    "addUser": "ユーザーを追加",
+    "editUser": "ユーザーを編集",
+    "deleteUser": "ユーザーを削除",
+    "fields": {
+      "name": "名前",
+      "email": "メールアドレス",
+      "role": "ロール",
+      "status": "ステータス",
+      "lastLogin": "最終ログイン",
+      "createdAt": "登録日"
+    },
+    "roles": {
+      "admin": "管理者",
+      "superAdmin": "スーパー管理者",
+      "user": "一般ユーザー"
+    }
+  }
+}

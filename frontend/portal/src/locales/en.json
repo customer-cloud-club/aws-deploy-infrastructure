@@ -1,0 +1,60 @@
+{
+  "common": {
+    "signIn": "Sign In",
+    "signUp": "Sign Up",
+    "signOut": "Sign Out",
+    "cancel": "Cancel",
+    "save": "Save",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success"
+  },
+  "auth": {
+    "login": {
+      "title": "Welcome back",
+      "description": "Sign in to access your AI products",
+      "email": "Email",
+      "password": "Password",
+      "forgotPassword": "Forgot password?",
+      "noAccount": "Don't have an account?",
+      "signInButton": "Sign in"
+    },
+    "register": {
+      "title": "Create your account",
+      "description": "Start using 1,000+ AI products today",
+      "email": "Email",
+      "password": "Password",
+      "confirmPassword": "Confirm Password",
+      "hasAccount": "Already have an account?",
+      "createButton": "Create account",
+      "terms": "By creating an account, you agree to our Terms of Service and Privacy Policy."
+    }
+  },
+  "plans": {
+    "title": "Choose your plan",
+    "description": "Access all AI Dreams Factory products with one subscription",
+    "monthly": "Monthly",
+    "annual": "Annual",
+    "save": "Save 20%",
+    "free": {
+      "name": "Free",
+      "description": "Perfect for trying out our AI products"
+    },
+    "pro": {
+      "name": "Pro",
+      "description": "For professionals and power users"
+    },
+    "enterprise": {
+      "name": "Enterprise",
+      "description": "For teams and organizations"
+    }
+  },
+  "account": {
+    "title": "Account",
+    "subscription": "Current Plan",
+    "usage": "Usage This Month",
+    "billingHistory": "Billing History",
+    "settings": "Account Settings",
+    "support": "Contact Support"
+  }
+}

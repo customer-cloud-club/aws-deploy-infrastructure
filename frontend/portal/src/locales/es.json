@@ -1,0 +1,60 @@
+{
+  "common": {
+    "signIn": "Iniciar sesión",
+    "signUp": "Registrarse",
+    "signOut": "Cerrar sesión",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "loading": "Cargando...",
+    "error": "Error",
+    "success": "Éxito"
+  },
+  "auth": {
+    "login": {
+      "title": "Bienvenido de nuevo",
+      "description": "Inicia sesión para acceder a tus productos de IA",
+      "email": "Correo electrónico",
+      "password": "Contraseña",
+      "forgotPassword": "¿Olvidaste tu contraseña?",
+      "noAccount": "¿No tienes cuenta?",
+      "signInButton": "Iniciar sesión"
+    },
+    "register": {
+      "title": "Crear cuenta",
+      "description": "Comienza a usar más de 1,000 productos de IA ahora",
+      "email": "Correo electrónico",
+      "password": "Contraseña",
+      "confirmPassword": "Confirmar contraseña",
+      "hasAccount": "¿Ya tienes cuenta?",
+      "createButton": "Crear cuenta",
+      "terms": "Al crear una cuenta, aceptas nuestros Términos de Servicio y Política de Privacidad."
+    }
+  },
+  "plans": {
+    "title": "Elige tu plan",
+    "description": "Una suscripción para acceder a todos los productos de AI Dreams Factory",
+    "monthly": "Mensual",
+    "annual": "Anual",
+    "save": "Ahorra 20%",
+    "free": {
+      "name": "Gratis",
+      "description": "Perfecto para probar productos de IA"
+    },
+    "pro": {
+      "name": "Pro",
+      "description": "Para profesionales y usuarios avanzados"
+    },
+    "enterprise": {
+      "name": "Enterprise",
+      "description": "Para equipos y organizaciones"
+    }
+  },
+  "account": {
+    "title": "Cuenta",
+    "subscription": "Plan actual",
+    "usage": "Uso este mes",
+    "billingHistory": "Historial de facturación",
+    "settings": "Configuración de cuenta",
+    "support": "Contactar soporte"
+  }
+}

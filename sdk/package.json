@@ -1,0 +1,41 @@
+{
+  "name": "@aidreams/platform-sdk",
+  "version": "1.0.0",
+  "description": "Platform SDK for AI Dreams Factory authentication and billing integration",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "lint": "eslint src/",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "aidreams",
+    "platform",
+    "sdk",
+    "authentication",
+    "billing"
+  ],
+  "author": "AI Dreams Factory",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "amazon-cognito-identity-js": "^6.0.0"
+  }
+}
