@@ -4,12 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "npm run build:watch",
     "build": "tsc",
     "build:watch": "tsc --watch",
     "test": "jest",
     "test:watch": "jest --watch",
     "lint": "eslint . --ext .ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "local": "sam local start-api -t ../terraform/modules/lambda/sam-template.yaml --env-vars .env.json"
   },
   "dependencies": {
     "pg": "^8.11.0",

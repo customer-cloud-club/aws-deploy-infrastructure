@@ -42,8 +42,9 @@ export async function requireAuth(): Promise<AuthUser> {
     if (accessToken && idToken && userJson) {
       try {
         const user = JSON.parse(userJson);
-        currentUser = { ...user, accessToken, idToken };
-        return currentUser;
+        const authUser: AuthUser = { ...user, accessToken, idToken };
+        currentUser = authUser;
+        return authUser;
       } catch {
         // パース失敗時は再認証
       }
@@ -105,11 +106,12 @@ export async function handleAuthCallback(code: string): Promise<AuthUser> {
     localStorage.setItem('platform_user', JSON.stringify(data.user));
   }
 
-  currentUser = {
+  const authUser: AuthUser = {
     ...data.user,
     accessToken: data.accessToken,
     idToken: data.idToken,
   };
+  currentUser = authUser;
 
-  return currentUser;
+  return authUser;
 }

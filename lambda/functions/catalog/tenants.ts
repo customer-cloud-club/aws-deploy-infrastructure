@@ -34,7 +34,7 @@ function toTenantResponse(row: TenantRow): TenantResponse {
 /**
  * Parses pagination parameters from query string
  */
-function parsePaginationParams(queryParams: Record<string, string> | null): PaginationParams {
+function parsePaginationParams(queryParams: Record<string, string | undefined> | null): PaginationParams {
   const page = Math.max(1, parseInt(queryParams?.['page'] || '1'));
   const perPage = Math.min(100, Math.max(1, parseInt(queryParams?.['per_page'] || '20')));
   const offset = (page - 1) * perPage;
@@ -70,7 +70,7 @@ function validateSubdomain(subdomain: string): boolean {
  * List all tenants with pagination
  */
 export async function listTenants(
-  queryParams: Record<string, string> | null
+  queryParams: Record<string, string | undefined> | null
 ): Promise<APIGatewayProxyResult> {
   try {
     const { page, per_page, offset } = parsePaginationParams(queryParams);

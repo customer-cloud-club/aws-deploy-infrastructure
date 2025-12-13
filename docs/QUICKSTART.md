@@ -6,14 +6,30 @@
 
 - Node.js 18以上
 - npm または yarn
-- AWSアカウント（オプション）
+- GitHub アカウント（GitHub Packages アクセス用）
 
 ## 3ステップで統合
 
-### Step 1: SDKインストール（1分）
+### Step 1: SDKインストール（2分）
+
+#### 1.1 GitHub Packages 認証設定
+
+プロジェクトルートに `.npmrc` を作成:
+
+```
+@customer-cloud-club:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
+```
+
+**GITHUB_TOKEN の取得:**
+1. GitHub → Settings → Developer settings → Personal access tokens
+2. `read:packages` スコープで新規トークン作成
+3. 環境変数に設定: `export GITHUB_TOKEN=ghp_xxxxx`
+
+#### 1.2 パッケージインストール
 
 ```bash
-npm install @aidreams/platform-sdk
+npm install @customer-cloud-club/platform-sdk amazon-cognito-identity-js
 ```
 
 ### Step 2: 環境変数設定（1分）
@@ -21,20 +37,22 @@ npm install @aidreams/platform-sdk
 `.env.local`に以下を追加:
 
 ```bash
-PRODUCT_ID=your-product-name
-PLATFORM_API_URL=https://p8uhqklb43.execute-api.ap-northeast-1.amazonaws.com/development
+NEXT_PUBLIC_PRODUCT_ID=your-product-name
+NEXT_PUBLIC_PLATFORM_API_URL=https://p8uhqklb43.execute-api.ap-northeast-1.amazonaws.com/development
+NEXT_PUBLIC_COGNITO_USER_POOL_ID=ap-northeast-1_lSPtvbFS7
+NEXT_PUBLIC_COGNITO_CLIENT_ID=5nm9g294deq3r8dl8qkq33eohp
 ```
 
 ### Step 3: SDKを初期化（5分）
 
 ```typescript
 // lib/platform.ts
-import { PlatformSDK } from '@aidreams/platform-sdk';
+import { PlatformSDK } from '@customer-cloud-club/platform-sdk';
 
 // アプリ起動時に1回だけ呼び出し
 PlatformSDK.init({
-  productId: process.env.PRODUCT_ID!,
-  apiUrl: process.env.PLATFORM_API_URL!,
+  productId: process.env.NEXT_PUBLIC_PRODUCT_ID!,
+  apiUrl: process.env.NEXT_PUBLIC_PLATFORM_API_URL!,
 });
 
 export { PlatformSDK };
@@ -137,7 +155,7 @@ export default function LoginPage() {
 
 ## 次のステップ
 
-- [SDK詳細ガイド](./SDK_GUIDE.md)
+- [統合ガイド（詳細）](./integration-guide.md) - React/Next.js完全統合例、サーバーサイド統合
 - [APIリファレンス](./API_REFERENCE.md)
 - [認証フロー解説](./AUTH_FLOW.md)
 - [課金フロー解説](./BILLING_FLOW.md)

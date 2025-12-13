@@ -1,0 +1,9 @@
+{
+  "name": "db-init-lambda",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "pg": "^8.11.0",
+    "@aws-sdk/rds-signer": "^3.400.0"
+  }
+}

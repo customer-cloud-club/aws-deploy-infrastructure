@@ -15,7 +15,7 @@
  * - POST   /admin/tenants           - Create tenant
  */
 
-import { APIGatewayProxyHandler, APIGatewayProxyResult } from 'aws-lambda';
+import { APIGatewayProxyHandler, APIGatewayProxyResult, APIGatewayProxyEventQueryStringParameters } from 'aws-lambda';
 import { initializeDatabase } from '../../shared/db/index.js';
 import { listProducts, createProduct, updateProduct, deleteProduct } from './products.js';
 import { listPlans, createPlan, updatePlan, deletePlan } from './plans.js';
@@ -189,7 +189,7 @@ async function handleProductsRoute(
   method: string,
   resourceId: string | null,
   body: string | null,
-  queryParams: Record<string, string> | null
+  queryParams: APIGatewayProxyEventQueryStringParameters | null
 ): Promise<APIGatewayProxyResult> {
   switch (method) {
     case 'GET':
@@ -263,7 +263,7 @@ async function handlePlansRoute(
   method: string,
   resourceId: string | null,
   body: string | null,
-  queryParams: Record<string, string> | null
+  queryParams: APIGatewayProxyEventQueryStringParameters | null
 ): Promise<APIGatewayProxyResult> {
   switch (method) {
     case 'GET':
@@ -337,7 +337,7 @@ async function handleTenantsRoute(
   method: string,
   resourceId: string | null,
   body: string | null,
-  queryParams: Record<string, string> | null
+  queryParams: APIGatewayProxyEventQueryStringParameters | null
 ): Promise<APIGatewayProxyResult> {
   switch (method) {
     case 'GET':

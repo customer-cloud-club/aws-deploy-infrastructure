@@ -22,7 +22,7 @@ import {
  * Initialize Stripe client
  */
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2024-11-20.acacia',
+  apiVersion: '2023-10-16',
   typescript: true,
 });
 
@@ -49,7 +49,7 @@ function toPlanResponse(row: PlanRow): PlanResponse {
 /**
  * Parses pagination parameters from query string
  */
-function parsePaginationParams(queryParams: Record<string, string> | null): PaginationParams {
+function parsePaginationParams(queryParams: Record<string, string | undefined> | null): PaginationParams {
   const page = Math.max(1, parseInt(queryParams?.['page'] || '1'));
   const perPage = Math.min(100, Math.max(1, parseInt(queryParams?.['per_page'] || '20')));
   const offset = (page - 1) * perPage;
@@ -129,7 +129,7 @@ async function createStripePrice(
  * List all plans with optional product_id filter
  */
 export async function listPlans(
-  queryParams: Record<string, string> | null
+  queryParams: Record<string, string | undefined> | null
 ): Promise<APIGatewayProxyResult> {
   try {
     const { page, per_page, offset } = parsePaginationParams(queryParams);

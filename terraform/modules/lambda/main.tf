@@ -53,7 +53,7 @@ resource "aws_cloudwatch_log_group" "lambda_logs" {
 resource "aws_lambda_function" "auth_pre_signup" {
   function_name = "${var.project_name}-auth-pre-signup"
   role          = aws_iam_role.lambda_exec.arn
-  handler       = "auth/pre-signup.handler"
+  handler       = "dist/functions/auth/pre-signup/handler.handler"
   runtime       = "nodejs20.x"
   timeout       = 10
   memory_size   = 256
@@ -96,7 +96,7 @@ resource "aws_lambda_alias" "auth_pre_signup_live" {
 resource "aws_lambda_function" "auth_post_confirmation" {
   function_name = "${var.project_name}-auth-post-confirmation"
   role          = aws_iam_role.lambda_exec.arn
-  handler       = "auth/post-confirmation.handler"
+  handler       = "dist/functions/auth/post-confirmation/handler.handler"
   runtime       = "nodejs20.x"
   timeout       = 30
   memory_size   = 256
@@ -147,7 +147,7 @@ resource "aws_lambda_alias" "auth_post_confirmation_live" {
 resource "aws_lambda_function" "auth_pre_token" {
   function_name = "${var.project_name}-auth-pre-token"
   role          = aws_iam_role.lambda_exec.arn
-  handler       = "auth/pre-token.handler"
+  handler       = "dist/functions/auth/pre-token/handler.handler"
   runtime       = "nodejs20.x"
   timeout       = 10
   memory_size   = 512
@@ -200,7 +200,7 @@ resource "aws_lambda_alias" "auth_pre_token_live" {
 resource "aws_lambda_function" "entitlement_check" {
   function_name = "${var.project_name}-entitlement-check"
   role          = aws_iam_role.lambda_exec.arn
-  handler       = "check/handler.handler"
+  handler       = "dist/functions/entitlement/check/handler.handler"
   runtime       = "nodejs20.x"
   timeout       = 30
   memory_size   = 256
@@ -267,7 +267,7 @@ resource "aws_lambda_alias" "entitlement_check_live" {
 resource "aws_lambda_function" "usage_recorder" {
   function_name = "${var.project_name}-usage-recorder"
   role          = aws_iam_role.lambda_exec.arn
-  handler       = "usage/recorder.handler"
+  handler       = "dist/functions/entitlement/usage/handler.handler"
   runtime       = "nodejs20.x"
   timeout       = 60
   memory_size   = 512
@@ -320,7 +320,7 @@ resource "aws_lambda_alias" "usage_recorder_live" {
 resource "aws_lambda_function" "webhook_processor" {
   function_name = "${var.project_name}-webhook-processor"
   role          = aws_iam_role.lambda_exec.arn
-  handler       = "webhook/processor.handler"
+  handler       = "dist/functions/billing/webhook/handler.handler"
   runtime       = "nodejs20.x"
   timeout       = 60
   memory_size   = 512
@@ -373,7 +373,7 @@ resource "aws_lambda_alias" "webhook_processor_live" {
 resource "aws_lambda_function" "checkout_handler" {
   function_name = "${var.project_name}-checkout-handler"
   role          = aws_iam_role.lambda_exec.arn
-  handler       = "checkout/handler.handler"
+  handler       = "dist/functions/billing/checkout/handler.handler"
   runtime       = "nodejs20.x"
   timeout       = 30
   memory_size   = 256
@@ -426,7 +426,7 @@ resource "aws_lambda_alias" "checkout_handler_live" {
 resource "aws_lambda_function" "admin_api" {
   function_name = "${var.project_name}-admin-api"
   role          = aws_iam_role.lambda_exec.arn
-  handler       = "admin/api.handler"
+  handler       = "dist/functions/admin/api/handler.handler"
   runtime       = "nodejs20.x"
   timeout       = 30
   memory_size   = 512

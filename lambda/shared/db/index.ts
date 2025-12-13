@@ -249,3 +249,4 @@ export async function checkDatabaseHealth() {
  * Re-exports pool utilities for advanced usage
  */
 export { executeQuery, executeTransaction, getPool } from './pool.js';
+export type { PoolClient } from './pool.js';

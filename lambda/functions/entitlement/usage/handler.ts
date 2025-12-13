@@ -89,7 +89,7 @@ export const handler: APIGatewayProxyHandler = async (event): Promise<APIGateway
         plan_limit: number;
       }>(
         `
-        UPDATE entitlements e
+        UPDATE user_entitlements e
         SET
           usage_count = usage_count + $3,
           updated_at = NOW()
@@ -97,8 +97,7 @@ export const handler: APIGatewayProxyHandler = async (event): Promise<APIGateway
         WHERE e.user_id = $1
           AND e.product_id = $2
           AND e.status = 'active'
-          AND e.plan_id = p.plan_id
-          AND e.product_id = p.product_id
+          AND e.plan_id = p.id
         RETURNING
           e.usage_count,
           COALESCE(e.usage_limit, p.usage_limit) as usage_limit,

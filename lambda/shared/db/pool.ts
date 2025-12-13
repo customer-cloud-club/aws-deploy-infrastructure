@@ -3,8 +3,13 @@
  * Uses RDS Proxy for connection pooling and automatic failover
  */
 
-import { Pool, PoolConfig, QueryResult as PgQueryResult } from 'pg';
+import { Pool, PoolConfig, QueryResult as PgQueryResult, PoolClient } from 'pg';
 import { DatabaseConfig, QueryResult } from '../types/index.js';
+
+/**
+ * Export PoolClient type for use in transaction callbacks
+ */
+export type { PoolClient };
 
 /**
  * Global connection pool instance
@@ -156,7 +161,7 @@ export async function executeQuery<T = unknown>(
  * ```
  */
 export async function executeTransaction<T>(
-  callback: (client: Pool['connect'] extends (...args: unknown[]) => Promise<infer C> ? C : never) => Promise<T>
+  callback: (client: PoolClient) => Promise<T>
 ): Promise<T> {
   if (!pool) {
     throw new Error('Database pool not initialized. Call getPool() first.');

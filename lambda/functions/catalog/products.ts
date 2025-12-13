@@ -36,7 +36,7 @@ function toProductResponse(row: ProductRow): ProductResponse {
 /**
  * Parses pagination parameters from query string
  */
-function parsePaginationParams(queryParams: Record<string, string> | null): PaginationParams {
+function parsePaginationParams(queryParams: Record<string, string | undefined> | null): PaginationParams {
   const page = Math.max(1, parseInt(queryParams?.['page'] || '1'));
   const perPage = Math.min(100, Math.max(1, parseInt(queryParams?.['per_page'] || '20')));
   const offset = (page - 1) * perPage;
@@ -63,7 +63,7 @@ async function invalidateProductCache(productId?: string): Promise<void> {
  * List all products with pagination
  */
 export async function listProducts(
-  queryParams: Record<string, string> | null
+  queryParams: Record<string, string | undefined> | null
 ): Promise<APIGatewayProxyResult> {
   try {
     const { page, per_page, offset } = parsePaginationParams(queryParams);
