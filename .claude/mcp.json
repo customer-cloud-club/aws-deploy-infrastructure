@@ -1,258 +1,60 @@
 {
   "mcpServers": {
+    "aws-universe": {
+      "command": "node",
+      "args": [".claude/mcp-servers/aws-universe.js"],
+      "env": {
+        "UNIVERSE_API_ENDPOINT": "https://06mkv2fwrj.execute-api.ap-northeast-1.amazonaws.com",
+        "AWS_REGION": "ap-northeast-1",
+        "MIYABI_PROJECT_ID": "aws-deploy-infrastructure"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "universe_search",
+        "universe_health",
+        "universe_metrics",
+        "universe_learn"
+      ],
+      "description": "Miyabi Universe MCP - 三層宇宙検索・θ₆学習・フィードバック"
+    },
     "aws-core": {
+      "type": "stdio",
       "command": "uvx",
       "args": ["awslabs.core-mcp-server@latest"],
       "env": {
-        "AWS_PROFILE": "${AWS_PROFILE}",
-        "AWS_REGION": "${AWS_REGION:-ap-northeast-1}",
         "FASTMCP_LOG_LEVEL": "ERROR"
       },
-      "disabled": false,
-      "description": "AWS Core MCP - 統合AWSサービスアクセス"
+      "description": "AWS Core MCP Server - AWSサービス横断の基盤機能"
     },
     "aws-documentation": {
+      "type": "stdio",
       "command": "uvx",
       "args": ["awslabs.aws-documentation-mcp-server@latest"],
       "env": {
-        "FASTMCP_LOG_LEVEL": "ERROR"
+        "FASTMCP_LOG_LEVEL": "ERROR",
+        "AWS_DOCUMENTATION_PARTITION": "aws"
       },
-      "disabled": false,
-      "description": "AWS Documentation - AWSドキュメント検索・参照"
+      "description": "AWS Documentation MCP - ドキュメント・ベストプラクティス検索"
     },
     "aws-cdk": {
+      "type": "stdio",
       "command": "uvx",
       "args": ["awslabs.cdk-mcp-server@latest"],
       "env": {
-        "AWS_PROFILE": "${AWS_PROFILE}",
-        "AWS_REGION": "${AWS_REGION:-ap-northeast-1}",
         "FASTMCP_LOG_LEVEL": "ERROR"
       },
-      "disabled": false,
-      "description": "AWS CDK MCP - Infrastructure as Code"
+      "description": "AWS CDK MCP Server - CDK構文・パターン支援"
     },
-    "aws-cloudformation": {
+    "aws-cfn": {
+      "type": "stdio",
       "command": "uvx",
       "args": ["awslabs.cfn-mcp-server@latest"],
       "env": {
-        "AWS_PROFILE": "${AWS_PROFILE}",
-        "AWS_REGION": "${AWS_REGION:-ap-northeast-1}",
-        "FASTMCP_LOG_LEVEL": "ERROR"
-      },
-      "disabled": false,
-      "description": "AWS CloudFormation MCP - スタック管理"
-    },
-    "aws-lambda": {
-      "command": "uvx",
-      "args": ["awslabs.lambda-tool-mcp-server@latest"],
-      "env": {
-        "AWS_PROFILE": "${AWS_PROFILE}",
-        "AWS_REGION": "${AWS_REGION:-ap-northeast-1}",
-        "FASTMCP_LOG_LEVEL": "ERROR"
-      },
-      "disabled": false,
-      "description": "AWS Lambda MCP - Lambda関数管理・実行"
-    },
-    "aws-bedrock-kb": {
-      "command": "uvx",
-      "args": ["awslabs.bedrock-kb-retrieval-mcp-server@latest"],
-      "env": {
-        "AWS_PROFILE": "${AWS_PROFILE}",
-        "AWS_REGION": "${AWS_REGION:-ap-northeast-1}",
-        "FASTMCP_LOG_LEVEL": "ERROR"
-      },
-      "disabled": false,
-      "description": "Amazon Bedrock Knowledge Bases - RAG検索"
-    },
-    "aws-s3": {
-      "command": "uvx",
-      "args": ["awslabs.s3-mcp-server@latest"],
-      "env": {
-        "AWS_PROFILE": "${AWS_PROFILE}",
-        "AWS_REGION": "${AWS_REGION:-ap-northeast-1}",
-        "FASTMCP_LOG_LEVEL": "ERROR"
-      },
-      "disabled": false,
-      "description": "Amazon S3 MCP - オブジェクトストレージ操作"
-    },
-    "aws-dynamodb": {
-      "command": "uvx",
-      "args": ["awslabs.dynamodb-mcp-server@latest"],
-      "env": {
-        "AWS_PROFILE": "${AWS_PROFILE}",
-        "AWS_REGION": "${AWS_REGION:-ap-northeast-1}",
         "FASTMCP_LOG_LEVEL": "ERROR",
-        "DDB_MCP_READONLY": "false"
+        "AWS_PROFILE": "default",
+        "AWS_REGION": "ap-northeast-1"
       },
-      "disabled": false,
-      "description": "Amazon DynamoDB MCP - NoSQLデータベース操作"
-    },
-    "aws-ecs": {
-      "command": "uvx",
-      "args": ["awslabs.ecs-mcp-server@latest"],
-      "env": {
-        "AWS_PROFILE": "${AWS_PROFILE}",
-        "AWS_REGION": "${AWS_REGION:-ap-northeast-1}",
-        "FASTMCP_LOG_LEVEL": "ERROR"
-      },
-      "disabled": false,
-      "description": "Amazon ECS MCP - コンテナサービス管理"
-    },
-    "aws-eks": {
-      "command": "uvx",
-      "args": ["awslabs.eks-mcp-server@latest"],
-      "env": {
-        "AWS_PROFILE": "${AWS_PROFILE}",
-        "AWS_REGION": "${AWS_REGION:-ap-northeast-1}",
-        "FASTMCP_LOG_LEVEL": "ERROR"
-      },
-      "disabled": false,
-      "description": "Amazon EKS MCP - Kubernetes管理"
-    },
-    "lark-mcp": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@larksuiteoapi/lark-mcp",
-        "mcp",
-        "-a", "${LARK_APP_ID}",
-        "-s", "${LARK_APP_SECRET}"
-      ],
-      "env": {
-        "LARK_APP_ID": "${LARK_APP_ID}",
-        "LARK_APP_SECRET": "${LARK_APP_SECRET}"
-      },
-      "disabled": false,
-      "description": "Lark/Feishu MCP - メッセージ・ドキュメント・Bitable操作"
-    },
-    "ide-integration": {
-      "command": "node",
-      "args": [".claude/mcp-servers/ide-integration.js"],
-      "disabled": false,
-      "description": "VS Code diagnostics and Jupyter execution integration"
-    },
-    "github-enhanced": {
-      "command": "node",
-      "args": [".claude/mcp-servers/github-enhanced.js"],
-      "env": {
-        "GITHUB_TOKEN": "${GITHUB_TOKEN}",
-        "REPOSITORY": "${REPOSITORY}"
-      },
-      "disabled": false,
-      "description": "Enhanced GitHub operations for Issue/PR management"
-    },
-    "project-context": {
-      "command": "node",
-      "args": [".claude/mcp-servers/project-context.js"],
-      "disabled": false,
-      "description": "Project-specific context and dependency information"
-    },
-    "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."],
-      "disabled": false,
-      "description": "Filesystem access for project files"
-    },
-    "context-engineering": {
-      "command": "node",
-      "args": ["external/context-engineering-mcp/mcp-server/index.js"],
-      "env": {
-        "AI_GUIDES_API_URL": "http://localhost:8888"
-      },
-      "disabled": false,
-      "description": "Context Engineering - AI-powered context analysis"
-    },
-    "ccagi-core": {
-      "command": "node",
-      "args": [".claude/mcp-servers/ccagi-core.js"],
-      "disabled": false,
-      "description": "CCAGI Core - 自律型AIエージェントシステム（ローカル完結型）",
-      "tools": {
-        "ccagi__status": {
-          "description": "プロジェクト状態確認",
-          "inputSchema": {
-            "type": "object",
-            "properties": {
-              "verbose": { "type": "boolean", "default": false }
-            }
-          }
-        },
-        "ccagi__agent_run": {
-          "description": "Agent実行",
-          "inputSchema": {
-            "type": "object",
-            "properties": {
-              "task": { "type": "string", "description": "タスク説明" },
-              "issueNumber": { "type": "number", "description": "Issue番号" },
-              "dryRun": { "type": "boolean", "default": false }
-            },
-            "required": ["task"]
-          }
-        },
-        "ccagi__todos": {
-          "description": "TODOコメント検出",
-          "inputSchema": {
-            "type": "object",
-            "properties": {
-              "path": { "type": "string", "default": "./src" }
-            }
-          }
-        },
-        "ccagi__config": {
-          "description": "設定管理",
-          "inputSchema": {
-            "type": "object",
-            "properties": {
-              "action": { "type": "string", "enum": ["show", "validate"] }
-            }
-          }
-        }
-      }
-    },
-    "dev3000": {
-      "command": "npx",
-      "args": ["-y", "dev3000", "--mcp"],
-      "disabled": false,
-      "description": "dev3000 - UI/UX統合デバッグツール"
-    },
-    "coordinator-agent": {
-      "command": "node",
-      "args": [".claude/mcp-servers/coordinator-agent.js"],
-      "disabled": false,
-      "description": "CoordinatorAgent - タスク統括・並行実行制御・依存関係解決"
-    },
-    "ccagi-integration": {
-      "command": "node",
-      "args": [".claude/mcp-servers/ccagi-integration.js"],
-      "disabled": false,
-      "description": "CCAGI Integration - CLI統合MCPサーバー（Miyabi完全互換 + CCAGI独自機能）"
-    },
-    "ccagi-llm": {
-      "command": "node",
-      "args": [".claude/mcp-servers/ccagi-llm.js"],
-      "env": {
-        "STARBOSE_BASE_URL": "http://69.5.22.110/v1",
-        "STARBOSE_MODEL": "openai/gpt-oss-120b"
-      },
-      "disabled": false,
-      "description": "CCAGI LLM - ローカルLLM（Starbose）統合MCPサーバー",
-      "tools": {
-        "llm__chat": {
-          "description": "Starbose LLMにチャットリクエストを送信"
-        },
-        "llm__complete": {
-          "description": "テキスト補完を実行"
-        },
-        "llm__code_generate": {
-          "description": "コード生成に特化したLLM呼び出し"
-        },
-        "llm__analyze": {
-          "description": "コード解析・レビュー"
-        },
-        "llm__status": {
-          "description": "LLM接続状態確認"
-        }
-      }
+      "description": "AWS CloudFormation MCP - CFnテンプレート・スタック管理"
     }
   }
 }

@@ -1,18 +1,42 @@
 {
   "name": "aws-deploy-infrastructure",
   "version": "1.0.0",
-  "description": "",
+  "description": "共通認証・課金基盤インフラストラクチャ",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "concurrently \"npm run dev:admin\" \"npm run dev:portal\" \"npm run dev:lambda\"",
+    "dev:admin": "cd frontend/admin && npm run dev",
+    "dev:portal": "cd frontend/portal && npm run dev",
+    "dev:lambda": "cd lambda && npm run dev",
+    "build": "npm run build:lambda && npm run build:admin && npm run build:portal",
+    "build:admin": "cd frontend/admin && npm run build",
+    "build:portal": "cd frontend/portal && npm run build",
+    "build:lambda": "cd lambda && npm run build",
+    "build:sdk": "cd sdk && npm run build",
+    "install:all": "npm install && cd lambda && npm install && cd ../frontend/admin && npm install && cd ../portal && npm install && cd ../../sdk && npm install",
+    "test": "npm run test:lambda",
+    "test:lambda": "cd lambda && npm test",
+    "lint": "npm run lint:admin && npm run lint:portal && npm run lint:lambda",
+    "lint:admin": "cd frontend/admin && npm run lint",
+    "lint:portal": "cd frontend/portal && npm run lint",
+    "lint:lambda": "cd lambda && npm run lint",
+    "deploy:dev": "cd terraform/envs/dev && terraform apply",
+    "deploy:frontend": "npm run build:admin && npm run build:portal && npm run sync:s3",
+    "sync:s3": "aws s3 sync frontend/admin/out s3://miyabi-admin-console-dev --delete && aws s3 sync frontend/portal/out s3://miyabi-portal-dev --delete"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "authentication",
+    "billing",
+    "platform",
+    "aws"
+  ],
+  "author": "AI Dreams Factory",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
     "@types/node": "^25.0.0",
     "aws-cdk-lib": "^2.232.1",
+    "concurrently": "^8.2.2",
     "constructs": "^10.4.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"

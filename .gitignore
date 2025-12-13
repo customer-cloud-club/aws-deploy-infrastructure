@@ -33,4 +33,14 @@ aws-deploy-infrastructure
 # Lambda build artifacts
 lambda-functions/dist/
 lambda/dist/
+lambda/*.zip
 tfplan
+
+# Scripts
+scripts/*.zip
+scripts/*.b64
+scripts/env*.json
+
+# SDK build artifacts
+sdk/dist/
+sdk/.npmrc
