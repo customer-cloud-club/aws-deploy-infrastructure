@@ -118,6 +118,7 @@ module "cognito" {
   callback_urls = [
     "http://localhost:3000/callback",           # Admin portal
     "http://localhost:3000/api/auth/callback",  # Admin portal API route
+    "http://localhost:3000/auth/callback",      # Admin portal client callback
     "http://localhost:3001/callback",           # Sample app
     "http://localhost:3001/api/auth/callback",  # Sample app API route
     "http://localhost:3001/auth/callback",      # Sample app client callback

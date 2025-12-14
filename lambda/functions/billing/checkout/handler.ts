@@ -14,8 +14,8 @@
  */
 
 import { APIGatewayProxyHandler, APIGatewayProxyResult } from 'aws-lambda';
-import { stripe } from '../stripe';
-import type { CheckoutSessionRequest, CheckoutSessionResponse } from '../types';
+import { getStripeClient } from '../stripe.js';
+import type { CheckoutSessionRequest, CheckoutSessionResponse } from '../types.js';
 
 /**
  * Create Stripe Checkout Session
@@ -163,6 +163,7 @@ async function createCheckoutSession(
   userId: string,
   request: CheckoutSessionRequest
 ): Promise<any> {
+  const stripe = await getStripeClient();
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     payment_method_types: ['card'],

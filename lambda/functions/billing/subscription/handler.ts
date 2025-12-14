@@ -14,7 +14,7 @@
 
 import { APIGatewayProxyHandler, APIGatewayProxyResult } from 'aws-lambda';
 import { initializeDatabase, query } from '../../../shared/db/index.js';
-import { stripe } from '../stripe.js';
+import { getStripeClient } from '../stripe.js';
 import type { SubscriptionResponse, SubscriptionStatus } from '../types.js';
 
 /**
@@ -267,6 +267,7 @@ async function cancelSubscription(event: Parameters<APIGatewayProxyHandler>[0]):
   const subscriptionId = result.rows[0]!.stripe_subscription_id;
 
   // Cancel subscription at period end via Stripe
+  const stripe = await getStripeClient();
   const updatedSubscription = await stripe.subscriptions.update(subscriptionId, {
     cancel_at_period_end: true,
   });
@@ -328,6 +329,7 @@ async function resumeSubscription(event: Parameters<APIGatewayProxyHandler>[0]):
   const subscriptionId = result.rows[0]!.stripe_subscription_id;
 
   // Resume subscription via Stripe
+  const stripe = await getStripeClient();
   const updatedSubscription = await stripe.subscriptions.update(subscriptionId, {
     cancel_at_period_end: false,
   });
@@ -405,6 +407,7 @@ async function updatePlan(event: Parameters<APIGatewayProxyHandler>[0]): Promise
   const subscriptionId = result.rows[0]!.stripe_subscription_id;
 
   // Retrieve current subscription from Stripe
+  const stripe = await getStripeClient();
   const currentSubscription = await stripe.subscriptions.retrieve(subscriptionId);
   const currentItemId = currentSubscription.items.data[0]?.id;
 
@@ -477,6 +480,7 @@ async function getCustomerPortal(event: Parameters<APIGatewayProxyHandler>[0]): 
   const customerId = result.rows[0]!.stripe_customer_id;
 
   // Create Stripe Customer Portal session
+  const stripe = await getStripeClient();
   const session = await stripe.billingPortal.sessions.create({
     customer: customerId,
     return_url: returnUrl,

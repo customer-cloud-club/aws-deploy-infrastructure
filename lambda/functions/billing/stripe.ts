@@ -1,36 +1,56 @@
 /**
  * Stripe Client Initialization
  *
- * Provides a singleton Stripe client instance configured with API key from environment variables.
- * Used across all billing-related Lambda functions for consistent Stripe API access.
+ * Provides a singleton Stripe client instance configured with API key from Secrets Manager.
+ * Uses lazy initialization pattern to allow async secret retrieval.
  *
  * @module billing/stripe
  */
 
 import Stripe from 'stripe';
+import { getStripeApiKey } from '../../shared/utils/secrets.js';
 
 /**
- * Validate Stripe API key existence
- * @throws {Error} If STRIPE_SECRET_KEY is not configured
+ * Cached Stripe client instance
  */
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('STRIPE_SECRET_KEY environment variable is required');
+let stripeClient: Stripe | null = null;
+
+/**
+ * Get or create Stripe client instance
+ * Uses lazy initialization to fetch API key from Secrets Manager on first use
+ *
+ * @returns Promise<Stripe> - Initialized Stripe client
+ */
+export async function getStripeClient(): Promise<Stripe> {
+  if (stripeClient) {
+    return stripeClient;
+  }
+
+  const apiKey = await getStripeApiKey();
+
+  stripeClient = new Stripe(apiKey, {
+    apiVersion: '2023-10-16',
+    typescript: true,
+    appInfo: {
+      name: 'CCAGI Billing Service',
+      version: '1.0.0',
+    },
+  });
+
+  return stripeClient;
 }
 
 /**
- * Singleton Stripe client instance
- *
- * Configuration:
- * - API Version: Latest (auto-updated by Stripe SDK)
- * - TypeScript: Enabled for type-safe operations
- * - App Info: Identifies requests from this application
+ * Legacy export for backward compatibility
+ * WARNING: This will throw if used before initialization
+ * Prefer using getStripeClient() instead
  */
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16',
-  typescript: true,
-  appInfo: {
-    name: 'CCAGI Billing Service',
-    version: '1.0.0',
+export const stripe = new Proxy({} as Stripe, {
+  get(_target, prop) {
+    if (!stripeClient) {
+      throw new Error('Stripe client not initialized. Use getStripeClient() first.');
+    }
+    return (stripeClient as any)[prop];
   },
 });
 

@@ -305,3 +305,40 @@ export async function getValidAccessToken(): Promise<string | null> {
   clearTokens();
   return null;
 }
+
+/**
+ * Get current ID token, refreshing if needed
+ * Note: API Gateway Cognito authorizer requires ID token, not access token
+ */
+export async function getValidIdToken(): Promise<string | null> {
+  const { tokens } = getStoredTokens();
+
+  if (!tokens) {
+    return null;
+  }
+
+  const expiryStr = localStorage.getItem(STORAGE_KEYS.TOKEN_EXPIRY);
+  const expiryTime = expiryStr ? parseInt(expiryStr) : 0;
+
+  // If token is not expired, return it
+  if (!isTokenExpired(expiryTime)) {
+    return tokens.idToken;
+  }
+
+  // Try to refresh
+  if (tokens.refreshToken) {
+    try {
+      const newTokens = await refreshAccessToken(tokens.refreshToken);
+      saveTokens(newTokens);
+      return newTokens.idToken;
+    } catch {
+      // Refresh failed, clear tokens
+      clearTokens();
+      return null;
+    }
+  }
+
+  // No refresh token available
+  clearTokens();
+  return null;
+}

@@ -18,12 +18,12 @@
 
 import { APIGatewayProxyHandler, APIGatewayProxyResult } from 'aws-lambda';
 import { Pool } from 'pg';
-import { stripe, STRIPE_WEBHOOK_SECRET } from '../stripe';
-import { checkIdempotency } from './idempotency';
-import { handleCheckoutCompleted } from './events/checkoutCompleted';
-import { handleInvoicePaid } from './events/invoicePaid';
-import { handleSubscriptionUpdated } from './events/subscriptionUpdated';
-import { handleSubscriptionDeleted } from './events/subscriptionDeleted';
+import { getStripeClient, STRIPE_WEBHOOK_SECRET } from '../stripe.js';
+import { checkIdempotency } from './idempotency.js';
+import { handleCheckoutCompleted } from './events/checkoutCompleted.js';
+import { handleInvoicePaid } from './events/invoicePaid.js';
+import { handleSubscriptionUpdated } from './events/subscriptionUpdated.js';
+import { handleSubscriptionDeleted } from './events/subscriptionDeleted.js';
 
 /**
  * PostgreSQL connection pool
@@ -82,6 +82,7 @@ export const handler: APIGatewayProxyHandler = async (event): Promise<APIGateway
   // Construct and verify Stripe event
   let stripeEvent;
   try {
+    const stripe = await getStripeClient();
     stripeEvent = stripe.webhooks.constructEvent(
       event.body || '',
       signature,

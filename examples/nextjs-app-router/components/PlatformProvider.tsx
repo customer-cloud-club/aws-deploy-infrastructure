@@ -9,7 +9,7 @@ import {
   clearTokens,
   getLoginUrl,
   getLogoutUrl,
-  getValidAccessToken,
+  getValidIdToken,
 } from '@/lib/auth';
 import { Entitlement, getEntitlement } from '@/lib/api';
 
@@ -53,8 +53,9 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
         const { tokens, user: storedUser } = getStoredTokens();
 
         if (tokens && storedUser) {
-          // Try to get valid access token (will refresh if needed)
-          const validToken = await getValidAccessToken();
+          // Try to get valid ID token (will refresh if needed)
+          // API Gateway Cognito authorizer requires ID token
+          const validToken = await getValidIdToken();
 
           if (validToken) {
             setUser(storedUser);
@@ -127,9 +128,9 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
     setAccessToken(tokens.accessToken);
   }, []);
 
-  // Get valid access token
+  // Get valid ID token for API calls (API Gateway Cognito authorizer requires ID token)
   const getAccessToken = useCallback(async (): Promise<string | null> => {
-    const token = await getValidAccessToken();
+    const token = await getValidIdToken();
     if (token !== accessToken) {
       setAccessToken(token);
     }
@@ -142,7 +143,7 @@ export function PlatformProvider({ children }: { children: ReactNode }) {
 
     setEntitlementLoading(true);
     try {
-      const token = await getValidAccessToken();
+      const token = await getValidIdToken();
       if (token) {
         const ent = await getEntitlement(PRODUCT_ID, token);
         setEntitlement(ent);
