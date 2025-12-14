@@ -48,7 +48,7 @@ export async function handleCheckoutCompleted(
 
     const customerId = session.customer as string;
     const subscriptionId = session.subscription as string;
-    const productId = session.metadata?.product_id;
+    const planId = session.metadata?.plan_id;
 
     if (!customerId) {
       throw new Error('Missing customer_id in checkout session');
@@ -59,7 +59,7 @@ export async function handleCheckoutCompleted(
 
     // 2. If subscription exists, create subscription record
     if (subscriptionId) {
-      await createSubscription(client, userId, customerId, subscriptionId, productId);
+      await createSubscription(client, userId, customerId, subscriptionId, planId);
     }
 
     console.log('[CheckoutCompleted] Successfully processed checkout completion', {
@@ -111,7 +111,7 @@ async function createSubscription(
   userId: string,
   customerId: string,
   subscriptionId: string,
-  productId: string | undefined
+  planId: string | undefined
 ): Promise<void> {
   // Check if subscription already exists
   const existing = await client.query(
@@ -126,13 +126,47 @@ async function createSubscription(
     return;
   }
 
+  // Get or create a default tenant for this user
+  let tenantId: string;
+  const tenantResult = await client.query(
+    `SELECT id FROM tenants WHERE subdomain = $1`,
+    [userId.replace(/[^a-zA-Z0-9]/g, '').substring(0, 63).toLowerCase() || 'default']
+  );
+
+  if (tenantResult.rows.length > 0) {
+    tenantId = tenantResult.rows[0].id;
+  } else {
+    // Create a default tenant for this user
+    const newTenant = await client.query(
+      `INSERT INTO tenants (name, subdomain, status)
+       VALUES ($1, $2, 'active')
+       RETURNING id`,
+      [`User ${userId}`, userId.replace(/[^a-zA-Z0-9]/g, '').substring(0, 63).toLowerCase() || `user-${Date.now()}`]
+    );
+    tenantId = newTenant.rows[0].id;
+  }
+
+  // If no plan_id provided, try to find a default plan
+  let finalPlanId = planId;
+  if (!finalPlanId) {
+    const defaultPlan = await client.query(
+      `SELECT id FROM plans WHERE is_active = true LIMIT 1`
+    );
+    if (defaultPlan.rows.length > 0) {
+      finalPlanId = defaultPlan.rows[0].id;
+    } else {
+      throw new Error('No active plan found and no plan_id provided');
+    }
+  }
+
   // Create initial subscription record
   // Status will be updated by subscription.updated webhook with full details
   await client.query(
     `
     INSERT INTO subscriptions (
+      tenant_id,
       user_id,
-      product_id,
+      plan_id,
       stripe_subscription_id,
       stripe_customer_id,
       status,
@@ -140,14 +174,15 @@ async function createSubscription(
       created_at,
       updated_at
     )
-    VALUES ($1, $2, $3, $4, 'incomplete', false, NOW(), NOW())
+    VALUES ($1, $2, $3, $4, $5, 'incomplete', false, NOW(), NOW())
     `,
-    [userId, productId || 'default', subscriptionId, customerId]
+    [tenantId, userId, finalPlanId, subscriptionId, customerId]
   );
 
   console.log('[CheckoutCompleted] Subscription record created', {
     userId,
     subscriptionId,
-    productId,
+    tenantId,
+    planId: finalPlanId,
   });
 }

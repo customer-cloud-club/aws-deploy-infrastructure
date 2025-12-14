@@ -15,6 +15,7 @@
 
 import { APIGatewayProxyHandler, APIGatewayProxyResult } from 'aws-lambda';
 import { getStripeClient } from '../stripe.js';
+import { query } from '../../../shared/db/index.js';
 import type { CheckoutSessionRequest, CheckoutSessionResponse } from '../types.js';
 
 /**
@@ -157,12 +158,28 @@ function validateRequest(request: CheckoutSessionRequest): string | null {
  * - Mode: subscription (recurring payment)
  * - Payment method types: card (can be extended to include other methods)
  * - Customer creation: automatic
- * - Metadata: Stores user_id and product_id for webhook processing
+ * - Metadata: Stores user_id, product_id, and plan_id for webhook processing
  */
 async function createCheckoutSession(
   userId: string,
   request: CheckoutSessionRequest
 ): Promise<any> {
+  // Look up internal plan_id from the stripe_price_id
+  // request.plan_id is the Stripe price ID (e.g., price_xxx)
+  let internalPlanId: string | undefined;
+  try {
+    const planResult = await query<{ id: string }>(
+      'SELECT id FROM plans WHERE stripe_price_id = $1',
+      [request.plan_id]
+    );
+    if (planResult.rows.length > 0) {
+      internalPlanId = planResult.rows[0]!.id;
+      console.log('[CheckoutHandler] Found internal plan_id:', internalPlanId);
+    }
+  } catch (err) {
+    console.warn('[CheckoutHandler] Could not look up internal plan_id:', err);
+  }
+
   const stripe = await getStripeClient();
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
@@ -179,6 +196,8 @@ async function createCheckoutSession(
     metadata: {
       user_id: userId,
       product_id: request.product_id,
+      plan_id: internalPlanId || '',
+      stripe_price_id: request.plan_id,
       ...(request.metadata || {}),
     },
     // Allow promotion codes
@@ -192,6 +211,7 @@ async function createCheckoutSession(
       metadata: {
         user_id: userId,
         product_id: request.product_id,
+        plan_id: internalPlanId || '',
       },
     },
     // Consent collection (if required for terms of service)

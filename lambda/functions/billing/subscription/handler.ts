@@ -107,6 +107,9 @@ function getUserId(event: Parameters<APIGatewayProxyHandler>[0]): string | null 
  */
 async function listSubscriptions(event: Parameters<APIGatewayProxyHandler>[0]): Promise<APIGatewayProxyResult> {
   const userId = getUserId(event);
+  console.log('[SubscriptionHandler] listSubscriptions userId:', userId);
+  console.log('[SubscriptionHandler] authorizer claims:', JSON.stringify(event.requestContext?.authorizer?.claims));
+
   if (!userId) {
     return {
       statusCode: 401,
@@ -147,6 +150,8 @@ async function listSubscriptions(event: Parameters<APIGatewayProxyHandler>[0]): 
     `,
     [userId]
   );
+
+  console.log('[SubscriptionHandler] Query result rows:', result.rows.length);
 
   const subscriptions = result.rows.map(row => ({
     id: row.id,

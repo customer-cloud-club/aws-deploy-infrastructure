@@ -93,6 +93,37 @@ export async function getStripeApiKey(): Promise<string> {
 }
 
 /**
+ * Retrieves Stripe Webhook Secret from Secrets Manager
+ *
+ * @returns Stripe Webhook Secret
+ */
+export async function getStripeWebhookSecret(): Promise<string> {
+  const secretArn = process.env.STRIPE_WEBHOOK_SECRET_ARN;
+
+  if (!secretArn) {
+    // Fallback to direct environment variable for local development
+    const directSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (directSecret) {
+      console.log('[Secrets] Using STRIPE_WEBHOOK_SECRET from environment');
+      return directSecret;
+    }
+    throw new Error('Neither STRIPE_WEBHOOK_SECRET_ARN nor STRIPE_WEBHOOK_SECRET is configured');
+  }
+
+  const secretValue = await getSecretValue(secretArn);
+
+  // The secret might be stored as plain string or JSON
+  try {
+    const parsed = JSON.parse(secretValue);
+    // If it's JSON, look for common key names
+    return parsed.webhook_secret || parsed.signing_secret || parsed.STRIPE_WEBHOOK_SECRET || secretValue;
+  } catch {
+    // Not JSON, return as-is
+    return secretValue;
+  }
+}
+
+/**
  * Clears the secret cache (useful for testing or forced refresh)
  */
 export function clearSecretCache(): void {

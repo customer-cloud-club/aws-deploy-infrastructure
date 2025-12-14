@@ -89,15 +89,26 @@ async function updateSubscription(
     : null;
   const cancelAtPeriodEnd = subscription.cancel_at_period_end;
 
-  // Extract product_id from subscription items
+  // Extract price_id from subscription items
   // Assuming single-item subscriptions for simplicity
   const firstItem = subscription.items.data[0];
   const priceId = firstItem?.price.id;
-  const productId = firstItem?.price.product as string;
+
+  // Look up plan_id from stripe_price_id
+  let planId: string | null = null;
+  if (priceId) {
+    const planResult = await client.query(
+      `SELECT id FROM plans WHERE stripe_price_id = $1`,
+      [priceId]
+    );
+    if (planResult.rows.length > 0) {
+      planId = planResult.rows[0].id;
+    }
+  }
 
   // Check if subscription exists
   const existing = await client.query(
-    `SELECT id FROM subscriptions WHERE stripe_subscription_id = $1`,
+    `SELECT id, plan_id FROM subscriptions WHERE stripe_subscription_id = $1`,
     [subscription.id]
   );
 
@@ -107,7 +118,7 @@ async function updateSubscription(
       `
       UPDATE subscriptions
       SET
-        product_id = COALESCE($1, product_id),
+        plan_id = COALESCE($1, plan_id),
         status = $2,
         current_period_start = $3,
         current_period_end = $4,
@@ -116,7 +127,7 @@ async function updateSubscription(
       WHERE stripe_subscription_id = $6
       `,
       [
-        productId,
+        planId,
         status,
         periodStart,
         periodEnd,
@@ -129,14 +140,54 @@ async function updateSubscription(
       subscriptionId: subscription.id,
       status,
       priceId,
+      planId,
     });
+
+    // Create or update entitlement if subscription is active or trialing
+    if (status === 'active' || status === 'trialing') {
+      const internalSubId = existing.rows[0].id;
+      await createOrUpdateEntitlement(client, userId, existing.rows[0].plan_id || planId, internalSubId);
+    }
   } else {
     // Create new subscription (in case checkout.session.completed was missed)
-    await client.query(
+    // First, get or create tenant
+    let tenantId: string;
+    const tenantResult = await client.query(
+      `SELECT id FROM tenants WHERE subdomain = $1`,
+      [userId.replace(/[^a-zA-Z0-9]/g, '').substring(0, 63).toLowerCase() || 'default']
+    );
+
+    if (tenantResult.rows.length > 0) {
+      tenantId = tenantResult.rows[0].id;
+    } else {
+      const newTenant = await client.query(
+        `INSERT INTO tenants (name, subdomain, status)
+         VALUES ($1, $2, 'active')
+         RETURNING id`,
+        [`User ${userId}`, userId.replace(/[^a-zA-Z0-9]/g, '').substring(0, 63).toLowerCase() || `user-${Date.now()}`]
+      );
+      tenantId = newTenant.rows[0].id;
+    }
+
+    // If no plan_id, get default plan
+    let finalPlanId = planId;
+    if (!finalPlanId) {
+      const defaultPlan = await client.query(
+        `SELECT id FROM plans WHERE is_active = true LIMIT 1`
+      );
+      if (defaultPlan.rows.length > 0) {
+        finalPlanId = defaultPlan.rows[0].id;
+      } else {
+        throw new Error('No active plan found and no plan_id resolved from Stripe');
+      }
+    }
+
+    const result = await client.query(
       `
       INSERT INTO subscriptions (
+        tenant_id,
         user_id,
-        product_id,
+        plan_id,
         stripe_subscription_id,
         stripe_customer_id,
         status,
@@ -146,11 +197,13 @@ async function updateSubscription(
         created_at,
         updated_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+      RETURNING id
       `,
       [
+        tenantId,
         userId,
-        productId || 'default',
+        finalPlanId,
         subscription.id,
         subscription.customer as string,
         status,
@@ -164,13 +217,70 @@ async function updateSubscription(
       subscriptionId: subscription.id,
       userId,
       status,
+      tenantId,
+      planId: finalPlanId,
     });
+
+    // Create entitlement if subscription is active or trialing
+    if (status === 'active' || status === 'trialing') {
+      await createOrUpdateEntitlement(client, userId, finalPlanId, result.rows[0].id);
+    }
   }
 
   // Log plan change if applicable
   if (firstItem && priceId) {
     logPlanChange(subscription.id, priceId, status);
   }
+}
+
+/**
+ * Create or update entitlement for the user
+ */
+async function createOrUpdateEntitlement(
+  client: PoolClient,
+  userId: string,
+  planId: string | null,
+  subscriptionId: string
+): Promise<void> {
+  if (!planId) {
+    console.warn('[SubscriptionUpdated] No plan_id for entitlement creation');
+    return;
+  }
+
+  // Get product_id from plan
+  const planResult = await client.query(
+    `SELECT product_id FROM plans WHERE id = $1`,
+    [planId]
+  );
+
+  if (planResult.rows.length === 0) {
+    console.warn('[SubscriptionUpdated] Plan not found for entitlement:', planId);
+    return;
+  }
+
+  const productId = planResult.rows[0].product_id;
+
+  // Upsert entitlement
+  await client.query(
+    `
+    INSERT INTO entitlements (user_id, product_id, plan_id, subscription_id, status)
+    VALUES ($1, $2, $3, $4, 'active')
+    ON CONFLICT (user_id, product_id) WHERE status = 'active'
+    DO UPDATE SET
+      plan_id = $3,
+      subscription_id = $4,
+      status = 'active',
+      updated_at = NOW()
+    `,
+    [userId, productId, planId, subscriptionId]
+  );
+
+  console.log('[SubscriptionUpdated] Entitlement created/updated', {
+    userId,
+    productId,
+    planId,
+    subscriptionId,
+  });
 }
 
 /**

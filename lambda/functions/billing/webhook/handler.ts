@@ -17,33 +17,13 @@
  */
 
 import { APIGatewayProxyHandler, APIGatewayProxyResult } from 'aws-lambda';
-import { Pool } from 'pg';
-import { getStripeClient, STRIPE_WEBHOOK_SECRET } from '../stripe.js';
+import { initializeDatabase } from '../../../shared/db/index.js';
+import { getStripeClient, getWebhookSecret } from '../stripe.js';
 import { checkIdempotency } from './idempotency.js';
 import { handleCheckoutCompleted } from './events/checkoutCompleted.js';
 import { handleInvoicePaid } from './events/invoicePaid.js';
 import { handleSubscriptionUpdated } from './events/subscriptionUpdated.js';
 import { handleSubscriptionDeleted } from './events/subscriptionDeleted.js';
-
-/**
- * PostgreSQL connection pool
- * Configured via environment variables:
- * - DB_HOST
- * - DB_PORT
- * - DB_NAME
- * - DB_USER
- * - DB_PASSWORD
- */
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: parseInt(process.env.DB_PORT || '5432', 10),
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  max: 10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-});
 
 /**
  * Stripe Webhook Handler
@@ -70,23 +50,26 @@ export const handler: APIGatewayProxyHandler = async (event): Promise<APIGateway
     };
   }
 
-  // Verify webhook secret is configured
-  if (!STRIPE_WEBHOOK_SECRET) {
-    console.error('[WebhookHandler] STRIPE_WEBHOOK_SECRET not configured');
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Webhook secret not configured' }),
-    };
-  }
-
   // Construct and verify Stripe event
   let stripeEvent;
   try {
-    const stripe = await getStripeClient();
+    const [stripe, webhookSecret] = await Promise.all([
+      getStripeClient(),
+      getWebhookSecret(),
+    ]);
+
+    if (!webhookSecret) {
+      console.error('[WebhookHandler] Webhook secret not configured');
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: 'Webhook secret not configured' }),
+      };
+    }
+
     stripeEvent = stripe.webhooks.constructEvent(
       event.body || '',
       signature,
-      STRIPE_WEBHOOK_SECRET
+      webhookSecret
     );
   } catch (err) {
     console.error('[WebhookHandler] Signature verification failed:', err);
@@ -101,7 +84,8 @@ export const handler: APIGatewayProxyHandler = async (event): Promise<APIGateway
     eventType: stripeEvent.type,
   });
 
-  // Process webhook event with transaction and idempotency
+  // Initialize database and process webhook event with transaction and idempotency
+  const pool = await initializeDatabase();
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -200,5 +184,6 @@ async function routeEvent(client: any, stripeEvent: any): Promise<void> {
  */
 process.on('SIGTERM', async () => {
   console.log('[WebhookHandler] SIGTERM received, closing database pool');
-  await pool.end();
+  const { closeDatabase } = await import('../../../shared/db/index.js');
+  await closeDatabase();
 });

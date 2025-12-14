@@ -110,9 +110,15 @@ async function createStripePrice(
     // Determine recurring interval for Stripe
     let recurring: Stripe.PriceCreateParams.Recurring | undefined;
     if (request.billing_period === 'monthly') {
-      recurring = { interval: 'month' };
+      recurring = {
+        interval: 'month',
+        ...(request.trial_period_days ? { trial_period_days: request.trial_period_days } : {}),
+      };
     } else if (request.billing_period === 'yearly') {
-      recurring = { interval: 'year' };
+      recurring = {
+        interval: 'year',
+        ...(request.trial_period_days ? { trial_period_days: request.trial_period_days } : {}),
+      };
     }
 
     const priceParams: Stripe.PriceCreateParams = {

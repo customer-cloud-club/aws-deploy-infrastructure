@@ -8,7 +8,7 @@
  */
 
 import Stripe from 'stripe';
-import { getStripeApiKey } from '../../shared/utils/secrets.js';
+import { getStripeApiKey, getStripeWebhookSecret } from '../../shared/utils/secrets.js';
 
 /**
  * Cached Stripe client instance
@@ -55,11 +55,27 @@ export const stripe = new Proxy({} as Stripe, {
 });
 
 /**
- * Stripe Webhook Secret
- * Used for webhook signature verification to ensure webhook events are authentic
+ * Cached webhook secret
+ */
+let cachedWebhookSecret: string | null = null;
+
+/**
+ * Get Stripe Webhook Secret from Secrets Manager
+ * Uses caching to avoid repeated API calls
+ *
+ * @returns Promise<string> - Webhook secret
+ */
+export async function getWebhookSecret(): Promise<string> {
+  if (cachedWebhookSecret) {
+    return cachedWebhookSecret;
+  }
+
+  cachedWebhookSecret = await getStripeWebhookSecret();
+  return cachedWebhookSecret;
+}
+
+/**
+ * Legacy export for backward compatibility
+ * @deprecated Use getWebhookSecret() instead
  */
 export const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || '';
-
-if (!STRIPE_WEBHOOK_SECRET) {
-  console.warn('STRIPE_WEBHOOK_SECRET not configured - webhook signature verification will fail');
-}

@@ -45,28 +45,45 @@ export async function handleInvoicePaid(
     const subscriptionId = invoice.subscription as string | null;
     const paymentIntentId = invoice.payment_intent as string | null;
 
-    // Get user_id from customer record
+    // Try to get user_id from customer record first
+    let userId: string | null = null;
     const userResult = await client.query(
       `SELECT user_id FROM customers WHERE stripe_customer_id = $1`,
       [customerId]
     );
 
-    if (!userResult.rows.length) {
-      throw new Error(`Customer not found: ${customerId}`);
+    if (userResult.rows.length > 0) {
+      userId = userResult.rows[0].user_id;
+    } else if (subscriptionId) {
+      // Fallback: try to get user_id from subscription record
+      const subResult = await client.query(
+        `SELECT user_id FROM subscriptions WHERE stripe_subscription_id = $1`,
+        [subscriptionId]
+      );
+      if (subResult.rows.length > 0) {
+        userId = subResult.rows[0].user_id;
+        console.log('[InvoicePaid] Got user_id from subscription record', { userId, subscriptionId });
+      }
     }
 
-    const userId = userResult.rows[0].user_id;
-
-    // 1. Create payment record
-    await createPaymentRecord(client, userId, invoice, subscriptionId, paymentIntentId);
-
-    // 2. Update subscription billing period if applicable
+    // 1. Update subscription billing period first (this is more important)
     if (subscriptionId) {
       await updateSubscriptionPeriod(client, subscriptionId, invoice);
     }
 
+    // 2. Create payment record if we have user_id
+    if (userId) {
+      await createPaymentRecord(client, userId, invoice, subscriptionId, paymentIntentId);
+    } else {
+      console.warn('[InvoicePaid] Could not find user_id for payment record, skipping', {
+        customerId,
+        subscriptionId,
+        invoiceId: invoice.id,
+      });
+    }
+
     console.log('[InvoicePaid] Successfully processed invoice payment', {
-      userId,
+      userId: userId || 'unknown',
       invoiceId: invoice.id,
       subscriptionId,
     });
@@ -164,7 +181,7 @@ async function updateSubscriptionPeriod(
   }
 
   // Update subscription record with new billing period
-  await client.query(
+  const result = await client.query(
     `
     UPDATE subscriptions
     SET
@@ -173,9 +190,18 @@ async function updateSubscriptionPeriod(
       status = 'active',
       updated_at = NOW()
     WHERE stripe_subscription_id = $3
+    RETURNING id
     `,
     [periodStart, periodEnd, subscriptionId]
   );
+
+  if (result.rowCount === 0) {
+    console.warn('[InvoicePaid] Subscription not found for period update (will be created by subscription.updated event)', {
+      subscriptionId,
+      invoiceId: invoice.id,
+    });
+    return;
+  }
 
   console.log('[InvoicePaid] Subscription billing period updated', {
     subscriptionId,
