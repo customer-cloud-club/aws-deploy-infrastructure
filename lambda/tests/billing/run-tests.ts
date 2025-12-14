@@ -17,9 +17,9 @@
  * @module tests/billing/run-tests
  */
 
-import { runAllTests as runCheckoutTests } from './checkout.test';
-import { runAllTests as runWebhookTests } from './webhook.test';
-import { runAllTests as runSubscriptionTests } from './subscription.test';
+import { runAllTests as runCheckoutTests } from './checkout.test.js';
+import { runAllTests as runWebhookTests } from './webhook.test.js';
+import { runAllTests as runSubscriptionTests } from './subscription.test.js';
 
 type TestSuite = 'checkout' | 'webhook' | 'subscription' | 'all';
 

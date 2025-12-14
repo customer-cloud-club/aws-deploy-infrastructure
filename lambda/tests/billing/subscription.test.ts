@@ -22,7 +22,7 @@ import {
   TestResult,
   assertStatus,
   parseBody,
-} from './test-utils';
+} from './test-utils.js';
 import type { APIGatewayProxyEvent, Context } from 'aws-lambda';
 
 /**
@@ -343,11 +343,6 @@ async function runAllTests(): Promise<void> {
   results.push(await runTest('Stripe API error handling', testStripeApiError));
 
   printResults(results);
-}
-
-// Run tests if executed directly
-if (require.main === module) {
-  runAllTests().catch(console.error);
 }
 
 export { runAllTests };
