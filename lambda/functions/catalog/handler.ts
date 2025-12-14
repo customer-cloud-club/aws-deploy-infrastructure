@@ -1,6 +1,6 @@
 /**
  * Catalog Service Lambda Handler
- * Manages products, plans, and tenants
+ * Manages products, plans, tenants, dashboard, and users
  *
  * Public Endpoints (no auth required):
  * - GET    /catalog/products        - List products (public)
@@ -17,6 +17,19 @@
  * - DELETE /admin/plans/{id}        - Delete plan
  * - GET    /admin/tenants           - List tenants
  * - POST   /admin/tenants           - Create tenant
+ *
+ * Dashboard Endpoints (admin auth required):
+ * - GET    /admin/dashboard         - Dashboard statistics
+ * - GET    /admin/dashboard/revenue - Revenue over time
+ * - GET    /admin/dashboard/users   - User growth over time
+ * - GET    /admin/dashboard/activity - Recent activity
+ *
+ * User Management Endpoints (admin auth required):
+ * - GET    /admin/users             - List users (Cognito)
+ * - GET    /admin/users/{id}        - Get user
+ * - POST   /admin/users             - Create user
+ * - PUT    /admin/users/{id}        - Update user
+ * - DELETE /admin/users/{id}        - Disable user
  */
 
 import { APIGatewayProxyHandler, APIGatewayProxyResult, APIGatewayProxyEventQueryStringParameters } from 'aws-lambda';
@@ -24,6 +37,8 @@ import { initializeDatabase } from '../../shared/db/index.js';
 import { getProduct, listProducts, createProduct, updateProduct, deleteProduct } from './products.js';
 import { getPlan, listPlans, createPlan, updatePlan, deletePlan } from './plans.js';
 import { getTenant, listTenants, createTenant } from './tenants.js';
+import { getDashboardStats, getRevenueData, getUserGrowthData, getRecentActivity } from '../admin/dashboard.js';
+import { listUsers, getUser, createUser, updateUser, deleteUser } from '../admin/users.js';
 import { AdminCheckResult } from './types.js';
 
 /**
@@ -189,6 +204,14 @@ export const handler: APIGatewayProxyHandler = async (event): Promise<APIGateway
 
       case 'tenants':
         result = await handleTenantsRoute(method, resourceId, event.body, event.queryStringParameters);
+        break;
+
+      case 'dashboard':
+        result = await handleDashboardRoute(method, path);
+        break;
+
+      case 'users':
+        result = await handleUsersRoute(method, resourceId, event.body, event.queryStringParameters);
         break;
 
       default:
@@ -411,6 +434,114 @@ async function handleTenantsRoute(
         body: JSON.stringify({
           error: 'Method Not Allowed',
           message: `Method ${method} not allowed for tenants`,
+        }),
+      };
+  }
+}
+
+/**
+ * Handles /admin/dashboard routes
+ */
+async function handleDashboardRoute(
+  method: string,
+  path: string
+): Promise<APIGatewayProxyResult> {
+  if (method !== 'GET') {
+    return {
+      statusCode: 405,
+      body: JSON.stringify({
+        error: 'Method Not Allowed',
+        message: `Method ${method} not allowed for dashboard`,
+      }),
+    };
+  }
+
+  // Route based on sub-path
+  if (path === '/admin/dashboard' || path === '/admin/dashboard/') {
+    return getDashboardStats();
+  }
+  if (path === '/admin/dashboard/revenue') {
+    return getRevenueData();
+  }
+  if (path === '/admin/dashboard/users') {
+    return getUserGrowthData();
+  }
+  if (path === '/admin/dashboard/activity') {
+    return getRecentActivity();
+  }
+
+  return {
+    statusCode: 404,
+    body: JSON.stringify({
+      error: 'Not Found',
+      message: 'Dashboard endpoint not found',
+    }),
+  };
+}
+
+/**
+ * Handles /admin/users routes
+ */
+async function handleUsersRoute(
+  method: string,
+  resourceId: string | null,
+  body: string | null,
+  queryParams: APIGatewayProxyEventQueryStringParameters | null
+): Promise<APIGatewayProxyResult> {
+  switch (method) {
+    case 'GET':
+      if (resourceId) {
+        // GET /admin/users/{id}
+        return getUser(resourceId);
+      }
+      // GET /admin/users
+      return listUsers(queryParams);
+
+    case 'POST':
+      if (!body) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({
+            error: 'Bad Request',
+            message: 'Request body required',
+          }),
+        };
+      }
+      // POST /admin/users
+      return createUser(body);
+
+    case 'PUT':
+      if (!resourceId || !body) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({
+            error: 'Bad Request',
+            message: 'Resource ID and request body required',
+          }),
+        };
+      }
+      // PUT /admin/users/{id}
+      return updateUser(resourceId, body);
+
+    case 'DELETE':
+      if (!resourceId) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({
+            error: 'Bad Request',
+            message: 'Resource ID required',
+          }),
+        };
+      }
+      // DELETE /admin/users/{id}
+      return deleteUser(resourceId);
+
+    default:
+      return {
+        statusCode: 405,
+        body: JSON.stringify({
+          error: 'Method Not Allowed',
+          message: `Method ${method} not allowed for users`,
         }),
       };
   }

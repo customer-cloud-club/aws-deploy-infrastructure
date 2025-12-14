@@ -60,6 +60,19 @@ provider:
             - xray:PutTraceSegments
             - xray:PutTelemetryRecords
           Resource: '*'
+        # Cognito User Management (for admin users API)
+        - Effect: Allow
+          Action:
+            - cognito-idp:ListUsers
+            - cognito-idp:AdminGetUser
+            - cognito-idp:AdminCreateUser
+            - cognito-idp:AdminUpdateUserAttributes
+            - cognito-idp:AdminDisableUser
+            - cognito-idp:AdminEnableUser
+            - cognito-idp:AdminAddUserToGroup
+            - cognito-idp:AdminRemoveUserFromGroup
+            - cognito-idp:AdminListGroupsForUser
+          Resource: ${self:custom.env.cognito.userPoolArn}
 
 custom:
   # Load environment-specific configuration
