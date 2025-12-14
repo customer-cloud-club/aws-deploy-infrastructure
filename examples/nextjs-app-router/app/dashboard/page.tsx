@@ -129,8 +129,13 @@ export default function DashboardPage() {
           </div>
           <div className="mb-4">
             <span className="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-              {entitlement.plan_id}
+              {entitlement.plan_name || entitlement.plan_id}
             </span>
+            {entitlement.price_amount !== undefined && (
+              <span className="ml-2 inline-block text-sm text-gray-600">
+                ¥{entitlement.price_amount.toLocaleString()}/{entitlement.billing_period === 'monthly' ? '月' : entitlement.billing_period === 'yearly' ? '年' : '回'}
+              </span>
+            )}
             <span className={`ml-2 inline-block px-3 py-1 rounded-full text-sm font-medium ${
               entitlement.status === 'active'
                 ? 'bg-green-100 text-green-800'
@@ -145,10 +150,10 @@ export default function DashboardPage() {
           <div className="bg-gray-50 p-4 rounded mb-4">
             <div className="flex justify-between items-center mb-2">
               <span className="text-sm text-gray-600">
-                使用量: {entitlement.usage.used.toLocaleString()} / {entitlement.usage.limit.toLocaleString()}
+                使用量: {(entitlement.usage?.used ?? 0).toLocaleString()} / {(entitlement.usage?.limit ?? 0).toLocaleString()}
               </span>
               <span className="text-sm text-gray-500">
-                残り: {entitlement.usage.remaining.toLocaleString()}
+                残り: {(entitlement.usage?.remaining ?? 0).toLocaleString()}
               </span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
@@ -161,7 +166,7 @@ export default function DashboardPage() {
                     : 'bg-blue-500'
                 }`}
                 style={{
-                  width: `${Math.min(100, (entitlement.usage.used / entitlement.usage.limit) * 100)}%`,
+                  width: `${Math.min(100, entitlement.usage?.limit ? ((entitlement.usage?.used ?? 0) / entitlement.usage.limit) * 100 : 0)}%`,
                 }}
               ></div>
             </div>
@@ -199,9 +204,11 @@ export default function DashboardPage() {
           )}
 
           {/* Valid Until */}
-          <div className="mt-4 text-sm text-gray-500">
-            有効期限: {new Date(entitlement.valid_until).toLocaleDateString('ja-JP')}
-          </div>
+          {entitlement.valid_until && (
+            <div className="mt-4 text-sm text-gray-500">
+              有効期限: {new Date(entitlement.valid_until).toLocaleDateString('ja-JP')}
+            </div>
+          )}
         </div>
       ) : (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6">

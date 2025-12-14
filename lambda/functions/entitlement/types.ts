@@ -68,6 +68,12 @@ export interface PlanRow {
  * Combined entitlement and plan data from JOIN query
  */
 export interface EntitlementWithPlan extends EntitlementRow {
+  /** Plan name (from plans table) */
+  plan_name?: string;
+  /** Price amount (from plans table) */
+  price_amount?: number;
+  /** Billing period (from plans table) */
+  billing_period?: string;
   /** Default plan limit (from plans table) */
   plan_limit: number;
   /** Plan feature flags (from plans table) */
@@ -100,6 +106,12 @@ export interface EntitlementResponse {
   product_id: string;
   /** Plan ID */
   plan_id: string;
+  /** Plan name */
+  plan_name?: string;
+  /** Price amount */
+  price_amount?: number;
+  /** Billing period */
+  billing_period?: string;
   /** Entitlement status */
   status: EntitlementStatus;
   /** Feature flags */

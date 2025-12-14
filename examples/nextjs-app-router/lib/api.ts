@@ -96,6 +96,9 @@ export interface EntitlementUsage {
 export interface Entitlement {
   product_id: string;
   plan_id: string;
+  plan_name?: string;
+  price_amount?: number;
+  billing_period?: string;
   status: 'active' | 'expired' | 'cancelled' | 'pending';
   features: Record<string, boolean | number | string>;
   usage: EntitlementUsage;
