@@ -59,6 +59,72 @@ async function invalidateProductCache(productId?: string): Promise<void> {
 }
 
 /**
+ * GET /admin/products/{id}
+ * Get a single product by ID
+ */
+export async function getProduct(productId: string): Promise<APIGatewayProxyResult> {
+  try {
+    // Check cache
+    const cacheKey = CatalogCacheKeys.product(productId);
+    let cached: ProductResponse | null = null;
+    try {
+      cached = await getCacheValue<ProductResponse>(cacheKey);
+      if (cached) {
+        console.log('[Products] Cache hit for single product');
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json', 'X-Cache': 'HIT' },
+          body: JSON.stringify(cached),
+        };
+      }
+    } catch (cacheError) {
+      console.warn('[Products] Cache read failed, continuing without cache:', cacheError);
+    }
+
+    const result = await query<ProductRow>(
+      'SELECT * FROM products WHERE id = $1 AND deleted_at IS NULL',
+      [productId]
+    );
+
+    if (result.rows.length === 0) {
+      return {
+        statusCode: 404,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          error: 'Not Found',
+          message: 'Product not found',
+        }),
+      };
+    }
+
+    const response = toProductResponse(result.rows[0]!);
+
+    // Cache response
+    try {
+      await setCacheValue(cacheKey, response, CatalogCacheTTL.PRODUCT);
+    } catch (cacheError) {
+      console.warn('[Products] Cache write failed, continuing without cache:', cacheError);
+    }
+
+    return {
+      statusCode: 200,
+      headers: { 'Content-Type': 'application/json', 'X-Cache': 'MISS' },
+      body: JSON.stringify(response),
+    };
+  } catch (error) {
+    console.error('[Products] Get error:', error);
+    return {
+      statusCode: 500,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        error: 'Internal Server Error',
+        message: 'Failed to get product',
+      }),
+    };
+  }
+}
+
+/**
  * GET /admin/products
  * List all products with pagination
  */

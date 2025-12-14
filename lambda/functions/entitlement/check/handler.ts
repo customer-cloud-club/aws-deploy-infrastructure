@@ -88,11 +88,11 @@ export const handler: APIGatewayProxyHandler = async (event): Promise<APIGateway
           e.valid_until,
           e.created_at,
           e.updated_at,
-          p.usage_limit as plan_limit,
-          p.feature_flags as plan_features,
-          p.soft_limit_percent
-        FROM user_entitlements e
-        JOIN plans p ON e.plan_id = p.id
+          p.metadata->>'usage_limit' as plan_limit,
+          p.metadata->>'features' as plan_features,
+          p.metadata->>'soft_limit_percent' as soft_limit_percent
+        FROM entitlements e
+        LEFT JOIN plans p ON e.plan_id = p.id
         WHERE e.user_id = $1 AND e.product_id = $2 AND e.status = 'active'
         LIMIT 1
         `,

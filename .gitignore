@@ -44,3 +44,4 @@ scripts/env*.json
 # SDK build artifacts
 sdk/dist/
 sdk/.npmrc
+lambda/.serverless/

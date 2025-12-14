@@ -145,6 +145,72 @@ async function createStripePrice(
 }
 
 /**
+ * GET /admin/plans/{id}
+ * Get a single plan by ID
+ */
+export async function getPlan(planId: string): Promise<APIGatewayProxyResult> {
+  try {
+    // Check cache
+    const cacheKey = CatalogCacheKeys.plan(planId);
+    let cached: PlanResponse | null = null;
+    try {
+      cached = await getCacheValue<PlanResponse>(cacheKey);
+      if (cached) {
+        console.log('[Plans] Cache hit for single plan');
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json', 'X-Cache': 'HIT' },
+          body: JSON.stringify(cached),
+        };
+      }
+    } catch (cacheError) {
+      console.warn('[Plans] Cache read failed, continuing without cache:', cacheError);
+    }
+
+    const result = await query<PlanRow>(
+      'SELECT * FROM plans WHERE id = $1 AND deleted_at IS NULL',
+      [planId]
+    );
+
+    if (result.rows.length === 0) {
+      return {
+        statusCode: 404,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          error: 'Not Found',
+          message: 'Plan not found',
+        }),
+      };
+    }
+
+    const response = toPlanResponse(result.rows[0]!);
+
+    // Cache response
+    try {
+      await setCacheValue(cacheKey, response, CatalogCacheTTL.PLAN);
+    } catch (cacheError) {
+      console.warn('[Plans] Cache write failed, continuing without cache:', cacheError);
+    }
+
+    return {
+      statusCode: 200,
+      headers: { 'Content-Type': 'application/json', 'X-Cache': 'MISS' },
+      body: JSON.stringify(response),
+    };
+  } catch (error) {
+    console.error('[Plans] Get error:', error);
+    return {
+      statusCode: 500,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        error: 'Internal Server Error',
+        message: 'Failed to get plan',
+      }),
+    };
+  }
+}
+
+/**
  * GET /admin/plans
  * List all plans with optional product_id filter
  */

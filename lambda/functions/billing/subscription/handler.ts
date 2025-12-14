@@ -2,378 +2,493 @@
  * Subscription Management Handler
  *
  * Provides subscription management operations:
- * - Get current subscription details
- * - Cancel subscription (at period end)
- * - Update/change subscription plan
- * - Resume canceled subscription
+ * - GET  /subscriptions           - List user's subscriptions
+ * - GET  /subscriptions/:id       - Get subscription details
+ * - POST /subscriptions/cancel    - Cancel subscription (at period end)
+ * - POST /subscriptions/resume    - Resume canceled subscription
+ * - POST /subscriptions/update    - Update/change subscription plan
+ * - GET  /subscriptions/portal    - Get Stripe Customer Portal URL
  *
  * @module billing/subscription/handler
  */
 
 import { APIGatewayProxyHandler, APIGatewayProxyResult } from 'aws-lambda';
-import { Pool } from 'pg';
-import { stripe } from '../stripe';
-import type { SubscriptionResponse, SubscriptionStatus } from '../types';
+import { initializeDatabase, query } from '../../../shared/db/index.js';
+import { stripe } from '../stripe.js';
+import type { SubscriptionResponse, SubscriptionStatus } from '../types.js';
 
 /**
- * PostgreSQL connection pool
+ * CORS headers
  */
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: parseInt(process.env.DB_PORT || '5432', 10),
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  max: 10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-});
+const corsHeaders = {
+  'Content-Type': 'application/json',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
 
 /**
- * Get User Subscription
- *
- * API Endpoint: GET /billing/subscription
- *
- * Returns current subscription details for authenticated user
+ * Main handler - routes to appropriate function based on path and method
  */
-export const getSubscription: APIGatewayProxyHandler = async (event): Promise<APIGatewayProxyResult> => {
-  console.log('[SubscriptionHandler] Getting user subscription');
+export const handler: APIGatewayProxyHandler = async (event): Promise<APIGatewayProxyResult> => {
+  // Handle CORS preflight
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 200, headers: corsHeaders, body: '' };
+  }
+
+  // Initialize database
+  await initializeDatabase();
+
+  const method = event.httpMethod;
+  const path = event.path || '';
+  const pathParts = path.split('/').filter(Boolean);
+
+  // Extract action from path: /subscriptions/{action}
+  const action = pathParts[1] || '';
+
+  console.log('[SubscriptionHandler] Request:', { method, path, action });
 
   try {
-    // Extract user ID from JWT
-    const userId = event.requestContext.authorizer?.claims?.sub;
-    if (!userId) {
-      return {
-        statusCode: 401,
-        body: JSON.stringify({ error: 'Unauthorized' }),
-      };
-    }
-
-    // Query subscription from database
-    const client = await pool.connect();
-    try {
-      const result = await client.query(
-        `
-        SELECT
-          stripe_subscription_id,
-          status,
-          current_period_start,
-          current_period_end,
-          cancel_at_period_end,
-          product_id
-        FROM subscriptions
-        WHERE user_id = $1
-        AND status IN ('active', 'trialing', 'past_due')
-        ORDER BY created_at DESC
-        LIMIT 1
-        `,
-        [userId]
-      );
-
-      if (!result.rows.length) {
-        return {
-          statusCode: 404,
-          body: JSON.stringify({ error: 'No active subscription found' }),
-        };
+    // Route based on method and action
+    if (method === 'GET') {
+      if (action === 'portal') {
+        return await getCustomerPortal(event);
       }
-
-      const subscription = result.rows[0];
-      const response: SubscriptionResponse = {
-        subscription_id: subscription.stripe_subscription_id,
-        status: subscription.status as SubscriptionStatus,
-        current_period_start: subscription.current_period_start?.toISOString() || '',
-        current_period_end: subscription.current_period_end?.toISOString() || '',
-        cancel_at_period_end: subscription.cancel_at_period_end,
-      };
-
-      return {
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(response),
-      };
-    } finally {
-      client.release();
+      if (action && action !== 'subscriptions') {
+        // GET /subscriptions/{id}
+        return await getSubscriptionById(event, action);
+      }
+      // GET /subscriptions
+      return await listSubscriptions(event);
     }
+
+    if (method === 'POST') {
+      switch (action) {
+        case 'cancel':
+          return await cancelSubscription(event);
+        case 'resume':
+          return await resumeSubscription(event);
+        case 'update':
+          return await updatePlan(event);
+        default:
+          return {
+            statusCode: 404,
+            headers: corsHeaders,
+            body: JSON.stringify({ error: 'Not Found', message: `Unknown action: ${action}` }),
+          };
+      }
+    }
+
+    return {
+      statusCode: 405,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Method Not Allowed' }),
+    };
   } catch (error) {
-    console.error('[SubscriptionHandler] Error getting subscription:', error);
+    console.error('[SubscriptionHandler] Error:', error);
     return {
       statusCode: 500,
+      headers: corsHeaders,
       body: JSON.stringify({ error: 'Internal server error' }),
     };
   }
 };
+
+/**
+ * Extract user ID from JWT
+ */
+function getUserId(event: Parameters<APIGatewayProxyHandler>[0]): string | null {
+  return event.requestContext?.authorizer?.claims?.sub || null;
+}
+
+/**
+ * List User Subscriptions
+ * GET /subscriptions
+ */
+async function listSubscriptions(event: Parameters<APIGatewayProxyHandler>[0]): Promise<APIGatewayProxyResult> {
+  const userId = getUserId(event);
+  if (!userId) {
+    return {
+      statusCode: 401,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Unauthorized' }),
+    };
+  }
+
+  const result = await query<{
+    id: string;
+    stripe_subscription_id: string;
+    stripe_customer_id: string;
+    plan_id: string;
+    status: string;
+    current_period_start: Date;
+    current_period_end: Date;
+    cancel_at_period_end: boolean;
+    created_at: Date;
+  }>(
+    `
+    SELECT
+      s.id,
+      s.stripe_subscription_id,
+      s.stripe_customer_id,
+      s.plan_id,
+      s.status,
+      s.current_period_start,
+      s.current_period_end,
+      s.cancel_at_period_end,
+      s.created_at,
+      p.name as plan_name,
+      pr.name as product_name
+    FROM subscriptions s
+    LEFT JOIN plans p ON s.plan_id = p.id
+    LEFT JOIN products pr ON p.product_id = pr.id
+    WHERE s.user_id = $1 AND s.deleted_at IS NULL
+    ORDER BY s.created_at DESC
+    `,
+    [userId]
+  );
+
+  const subscriptions = result.rows.map(row => ({
+    id: row.id,
+    subscription_id: row.stripe_subscription_id,
+    plan_id: row.plan_id,
+    status: row.status,
+    current_period_start: row.current_period_start?.toISOString() || '',
+    current_period_end: row.current_period_end?.toISOString() || '',
+    cancel_at_period_end: row.cancel_at_period_end,
+    created_at: row.created_at?.toISOString() || '',
+  }));
+
+  return {
+    statusCode: 200,
+    headers: corsHeaders,
+    body: JSON.stringify({ subscriptions, total: subscriptions.length }),
+  };
+}
+
+/**
+ * Get Subscription by ID
+ * GET /subscriptions/{id}
+ */
+async function getSubscriptionById(
+  event: Parameters<APIGatewayProxyHandler>[0],
+  subscriptionId: string
+): Promise<APIGatewayProxyResult> {
+  const userId = getUserId(event);
+  if (!userId) {
+    return {
+      statusCode: 401,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Unauthorized' }),
+    };
+  }
+
+  const result = await query<{
+    id: string;
+    stripe_subscription_id: string;
+    stripe_customer_id: string;
+    plan_id: string;
+    status: string;
+    current_period_start: Date;
+    current_period_end: Date;
+    cancel_at_period_end: boolean;
+    canceled_at: Date | null;
+    created_at: Date;
+  }>(
+    `
+    SELECT *
+    FROM subscriptions
+    WHERE (id = $1 OR stripe_subscription_id = $1)
+      AND user_id = $2
+      AND deleted_at IS NULL
+    `,
+    [subscriptionId, userId]
+  );
+
+  if (result.rows.length === 0) {
+    return {
+      statusCode: 404,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Subscription not found' }),
+    };
+  }
+
+  const row = result.rows[0]!;
+  const response: SubscriptionResponse = {
+    subscription_id: row.stripe_subscription_id,
+    status: row.status as SubscriptionStatus,
+    current_period_start: row.current_period_start?.toISOString() || '',
+    current_period_end: row.current_period_end?.toISOString() || '',
+    cancel_at_period_end: row.cancel_at_period_end,
+  };
+
+  return {
+    statusCode: 200,
+    headers: corsHeaders,
+    body: JSON.stringify(response),
+  };
+}
 
 /**
  * Cancel Subscription
- *
- * API Endpoint: POST /billing/subscription/cancel
- *
- * Cancels subscription at the end of current billing period
+ * POST /subscriptions/cancel
  */
-export const cancelSubscription: APIGatewayProxyHandler = async (event): Promise<APIGatewayProxyResult> => {
-  console.log('[SubscriptionHandler] Canceling subscription');
-
-  try {
-    const userId = event.requestContext.authorizer?.claims?.sub;
-    if (!userId) {
-      return {
-        statusCode: 401,
-        body: JSON.stringify({ error: 'Unauthorized' }),
-      };
-    }
-
-    // Get active subscription
-    const client = await pool.connect();
-    try {
-      const result = await client.query(
-        `
-        SELECT stripe_subscription_id, status
-        FROM subscriptions
-        WHERE user_id = $1
-        AND status IN ('active', 'trialing')
-        ORDER BY created_at DESC
-        LIMIT 1
-        `,
-        [userId]
-      );
-
-      if (!result.rows.length) {
-        return {
-          statusCode: 404,
-          body: JSON.stringify({ error: 'No active subscription found' }),
-        };
-      }
-
-      const subscriptionId = result.rows[0].stripe_subscription_id;
-
-      // Cancel subscription at period end via Stripe
-      const updatedSubscription = await stripe.subscriptions.update(subscriptionId, {
-        cancel_at_period_end: true,
-      });
-
-      console.log('[SubscriptionHandler] Subscription canceled successfully', {
-        userId,
-        subscriptionId,
-        cancelAt: updatedSubscription.current_period_end,
-      });
-
-      return {
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: 'Subscription will be canceled at period end',
-          cancel_at: new Date(updatedSubscription.current_period_end * 1000).toISOString(),
-        }),
-      };
-    } finally {
-      client.release();
-    }
-  } catch (error) {
-    console.error('[SubscriptionHandler] Error canceling subscription:', error);
+async function cancelSubscription(event: Parameters<APIGatewayProxyHandler>[0]): Promise<APIGatewayProxyResult> {
+  const userId = getUserId(event);
+  if (!userId) {
     return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Internal server error' }),
+      statusCode: 401,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Unauthorized' }),
     };
   }
-};
+
+  const result = await query<{ stripe_subscription_id: string }>(
+    `
+    SELECT stripe_subscription_id
+    FROM subscriptions
+    WHERE user_id = $1
+      AND status IN ('active', 'trialing')
+      AND deleted_at IS NULL
+    ORDER BY created_at DESC
+    LIMIT 1
+    `,
+    [userId]
+  );
+
+  if (result.rows.length === 0) {
+    return {
+      statusCode: 404,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'No active subscription found' }),
+    };
+  }
+
+  const subscriptionId = result.rows[0]!.stripe_subscription_id;
+
+  // Cancel subscription at period end via Stripe
+  const updatedSubscription = await stripe.subscriptions.update(subscriptionId, {
+    cancel_at_period_end: true,
+  });
+
+  // Update local database
+  await query(
+    `UPDATE subscriptions SET cancel_at_period_end = true, updated_at = NOW() WHERE stripe_subscription_id = $1`,
+    [subscriptionId]
+  );
+
+  console.log('[SubscriptionHandler] Subscription canceled', { userId, subscriptionId });
+
+  return {
+    statusCode: 200,
+    headers: corsHeaders,
+    body: JSON.stringify({
+      message: 'Subscription will be canceled at period end',
+      cancel_at: new Date(updatedSubscription.current_period_end * 1000).toISOString(),
+    }),
+  };
+}
 
 /**
  * Resume Subscription
- *
- * API Endpoint: POST /billing/subscription/resume
- *
- * Resumes a subscription that was scheduled for cancellation
+ * POST /subscriptions/resume
  */
-export const resumeSubscription: APIGatewayProxyHandler = async (event): Promise<APIGatewayProxyResult> => {
-  console.log('[SubscriptionHandler] Resuming subscription');
-
-  try {
-    const userId = event.requestContext.authorizer?.claims?.sub;
-    if (!userId) {
-      return {
-        statusCode: 401,
-        body: JSON.stringify({ error: 'Unauthorized' }),
-      };
-    }
-
-    // Get subscription scheduled for cancellation
-    const client = await pool.connect();
-    try {
-      const result = await client.query(
-        `
-        SELECT stripe_subscription_id
-        FROM subscriptions
-        WHERE user_id = $1
-        AND cancel_at_period_end = true
-        AND status IN ('active', 'trialing')
-        ORDER BY created_at DESC
-        LIMIT 1
-        `,
-        [userId]
-      );
-
-      if (!result.rows.length) {
-        return {
-          statusCode: 404,
-          body: JSON.stringify({ error: 'No subscription scheduled for cancellation' }),
-        };
-      }
-
-      const subscriptionId = result.rows[0].stripe_subscription_id;
-
-      // Resume subscription via Stripe
-      const updatedSubscription = await stripe.subscriptions.update(subscriptionId, {
-        cancel_at_period_end: false,
-      });
-
-      console.log('[SubscriptionHandler] Subscription resumed successfully', {
-        userId,
-        subscriptionId,
-      });
-
-      return {
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: 'Subscription resumed successfully',
-          next_billing_date: new Date(updatedSubscription.current_period_end * 1000).toISOString(),
-        }),
-      };
-    } finally {
-      client.release();
-    }
-  } catch (error) {
-    console.error('[SubscriptionHandler] Error resuming subscription:', error);
+async function resumeSubscription(event: Parameters<APIGatewayProxyHandler>[0]): Promise<APIGatewayProxyResult> {
+  const userId = getUserId(event);
+  if (!userId) {
     return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Internal server error' }),
+      statusCode: 401,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Unauthorized' }),
     };
   }
-};
+
+  const result = await query<{ stripe_subscription_id: string }>(
+    `
+    SELECT stripe_subscription_id
+    FROM subscriptions
+    WHERE user_id = $1
+      AND cancel_at_period_end = true
+      AND status IN ('active', 'trialing')
+      AND deleted_at IS NULL
+    ORDER BY created_at DESC
+    LIMIT 1
+    `,
+    [userId]
+  );
+
+  if (result.rows.length === 0) {
+    return {
+      statusCode: 404,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'No subscription scheduled for cancellation' }),
+    };
+  }
+
+  const subscriptionId = result.rows[0]!.stripe_subscription_id;
+
+  // Resume subscription via Stripe
+  const updatedSubscription = await stripe.subscriptions.update(subscriptionId, {
+    cancel_at_period_end: false,
+  });
+
+  // Update local database
+  await query(
+    `UPDATE subscriptions SET cancel_at_period_end = false, updated_at = NOW() WHERE stripe_subscription_id = $1`,
+    [subscriptionId]
+  );
+
+  console.log('[SubscriptionHandler] Subscription resumed', { userId, subscriptionId });
+
+  return {
+    statusCode: 200,
+    headers: corsHeaders,
+    body: JSON.stringify({
+      message: 'Subscription resumed successfully',
+      next_billing_date: new Date(updatedSubscription.current_period_end * 1000).toISOString(),
+    }),
+  };
+}
 
 /**
  * Update Subscription Plan
- *
- * API Endpoint: POST /billing/subscription/update-plan
- *
- * Request Body:
- * ```json
- * {
- *   "new_plan_id": "price_xxx"
- * }
- * ```
- *
- * Changes subscription to a new plan (upgrade or downgrade)
+ * POST /subscriptions/update
  */
-export const updatePlan: APIGatewayProxyHandler = async (event): Promise<APIGatewayProxyResult> => {
-  console.log('[SubscriptionHandler] Updating subscription plan');
-
-  try {
-    const userId = event.requestContext.authorizer?.claims?.sub;
-    if (!userId) {
-      return {
-        statusCode: 401,
-        body: JSON.stringify({ error: 'Unauthorized' }),
-      };
-    }
-
-    // Parse request body
-    if (!event.body) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: 'Missing request body' }),
-      };
-    }
-
-    const { new_plan_id } = JSON.parse(event.body);
-    if (!new_plan_id) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: 'Missing new_plan_id' }),
-      };
-    }
-
-    // Get active subscription
-    const client = await pool.connect();
-    try {
-      const result = await client.query(
-        `
-        SELECT stripe_subscription_id, status
-        FROM subscriptions
-        WHERE user_id = $1
-        AND status IN ('active', 'trialing')
-        ORDER BY created_at DESC
-        LIMIT 1
-        `,
-        [userId]
-      );
-
-      if (!result.rows.length) {
-        return {
-          statusCode: 404,
-          body: JSON.stringify({ error: 'No active subscription found' }),
-        };
-      }
-
-      const subscriptionId = result.rows[0].stripe_subscription_id;
-
-      // Retrieve current subscription from Stripe
-      const currentSubscription = await stripe.subscriptions.retrieve(subscriptionId);
-      const currentItemId = currentSubscription.items.data[0].id;
-
-      // Update subscription with new price
-      const updatedSubscription = await stripe.subscriptions.update(subscriptionId, {
-        items: [
-          {
-            id: currentItemId,
-            price: new_plan_id,
-          },
-        ],
-        proration_behavior: 'create_prorations', // Prorate the difference
-      });
-
-      console.log('[SubscriptionHandler] Subscription plan updated successfully', {
-        userId,
-        subscriptionId,
-        newPlanId: new_plan_id,
-      });
-
-      return {
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: 'Subscription plan updated successfully',
-          subscription_id: updatedSubscription.id,
-          effective_date: new Date().toISOString(),
-        }),
-      };
-    } finally {
-      client.release();
-    }
-  } catch (error) {
-    console.error('[SubscriptionHandler] Error updating subscription plan:', error);
-
-    if ((error as any).type === 'StripeInvalidRequestError') {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({
-          error: 'Invalid plan',
-          details: (error as Error).message,
-        }),
-      };
-    }
-
+async function updatePlan(event: Parameters<APIGatewayProxyHandler>[0]): Promise<APIGatewayProxyResult> {
+  const userId = getUserId(event);
+  if (!userId) {
     return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Internal server error' }),
+      statusCode: 401,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Unauthorized' }),
     };
   }
-};
+
+  if (!event.body) {
+    return {
+      statusCode: 400,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Missing request body' }),
+    };
+  }
+
+  const { new_plan_id } = JSON.parse(event.body);
+  if (!new_plan_id) {
+    return {
+      statusCode: 400,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Missing new_plan_id' }),
+    };
+  }
+
+  const result = await query<{ stripe_subscription_id: string }>(
+    `
+    SELECT stripe_subscription_id
+    FROM subscriptions
+    WHERE user_id = $1
+      AND status IN ('active', 'trialing')
+      AND deleted_at IS NULL
+    ORDER BY created_at DESC
+    LIMIT 1
+    `,
+    [userId]
+  );
+
+  if (result.rows.length === 0) {
+    return {
+      statusCode: 404,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'No active subscription found' }),
+    };
+  }
+
+  const subscriptionId = result.rows[0]!.stripe_subscription_id;
+
+  // Retrieve current subscription from Stripe
+  const currentSubscription = await stripe.subscriptions.retrieve(subscriptionId);
+  const currentItemId = currentSubscription.items.data[0]?.id;
+
+  if (!currentItemId) {
+    return {
+      statusCode: 500,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Failed to retrieve subscription items' }),
+    };
+  }
+
+  // Update subscription with new price
+  const updatedSubscription = await stripe.subscriptions.update(subscriptionId, {
+    items: [{ id: currentItemId, price: new_plan_id }],
+    proration_behavior: 'create_prorations',
+  });
+
+  console.log('[SubscriptionHandler] Subscription plan updated', { userId, subscriptionId, new_plan_id });
+
+  return {
+    statusCode: 200,
+    headers: corsHeaders,
+    body: JSON.stringify({
+      message: 'Subscription plan updated successfully',
+      subscription_id: updatedSubscription.id,
+      effective_date: new Date().toISOString(),
+    }),
+  };
+}
 
 /**
- * Graceful shutdown
+ * Get Stripe Customer Portal URL
+ * GET /subscriptions/portal
  */
-process.on('SIGTERM', async () => {
-  console.log('[SubscriptionHandler] SIGTERM received, closing database pool');
-  await pool.end();
-});
+async function getCustomerPortal(event: Parameters<APIGatewayProxyHandler>[0]): Promise<APIGatewayProxyResult> {
+  const userId = getUserId(event);
+  if (!userId) {
+    return {
+      statusCode: 401,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Unauthorized' }),
+    };
+  }
+
+  // Get return URL from query params or use default
+  const returnUrl = event.queryStringParameters?.return_url || 'https://example.com/account';
+
+  // Get customer ID from database
+  const result = await query<{ stripe_customer_id: string }>(
+    `
+    SELECT stripe_customer_id
+    FROM subscriptions
+    WHERE user_id = $1
+      AND stripe_customer_id IS NOT NULL
+      AND deleted_at IS NULL
+    ORDER BY created_at DESC
+    LIMIT 1
+    `,
+    [userId]
+  );
+
+  if (result.rows.length === 0 || !result.rows[0]!.stripe_customer_id) {
+    return {
+      statusCode: 404,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'No customer found' }),
+    };
+  }
+
+  const customerId = result.rows[0]!.stripe_customer_id;
+
+  // Create Stripe Customer Portal session
+  const session = await stripe.billingPortal.sessions.create({
+    customer: customerId,
+    return_url: returnUrl,
+  });
+
+  console.log('[SubscriptionHandler] Customer portal session created', { userId, customerId });
+
+  return {
+    statusCode: 200,
+    headers: corsHeaders,
+    body: JSON.stringify({
+      url: session.url,
+    }),
+  };
+}

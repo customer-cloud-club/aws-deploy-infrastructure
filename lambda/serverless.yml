@@ -155,6 +155,20 @@ functions:
           authorizer:
             type: COGNITO_USER_POOLS
             authorizerId: !Ref ApiGatewayAuthorizer
+
+  # Subscription management
+  subscriptionHandler:
+    handler: dist/functions/billing/subscription/handler.handler
+    memorySize: 256
+    timeout: 30
+    events:
+      - http:
+          path: subscriptions
+          method: get
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: !Ref ApiGatewayAuthorizer
       - http:
           path: subscriptions/{proxy+}
           method: any

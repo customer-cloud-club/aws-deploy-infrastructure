@@ -66,6 +66,71 @@ function validateSubdomain(subdomain: string): boolean {
 }
 
 /**
+ * GET /admin/tenants/{id}
+ * Get a single tenant by ID
+ */
+export async function getTenant(tenantId: string): Promise<APIGatewayProxyResult> {
+  try {
+    // Check cache
+    const cacheKey = CatalogCacheKeys.tenant(tenantId);
+    try {
+      const cached = await getCacheValue<TenantResponse>(cacheKey);
+      if (cached) {
+        console.log('[Tenants] Cache hit for single tenant');
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json', 'X-Cache': 'HIT' },
+          body: JSON.stringify(cached),
+        };
+      }
+    } catch (cacheError) {
+      console.warn('[Tenants] Cache read failed, continuing without cache:', cacheError);
+    }
+
+    const result = await query<TenantRow>(
+      'SELECT * FROM tenants WHERE id = $1 AND deleted_at IS NULL',
+      [tenantId]
+    );
+
+    if (result.rows.length === 0) {
+      return {
+        statusCode: 404,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          error: 'Not Found',
+          message: 'Tenant not found',
+        }),
+      };
+    }
+
+    const response = toTenantResponse(result.rows[0]!);
+
+    // Cache response
+    try {
+      await setCacheValue(cacheKey, response, CatalogCacheTTL.TENANT);
+    } catch (cacheError) {
+      console.warn('[Tenants] Cache write failed, continuing without cache:', cacheError);
+    }
+
+    return {
+      statusCode: 200,
+      headers: { 'Content-Type': 'application/json', 'X-Cache': 'MISS' },
+      body: JSON.stringify(response),
+    };
+  } catch (error) {
+    console.error('[Tenants] Get error:', error);
+    return {
+      statusCode: 500,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        error: 'Internal Server Error',
+        message: 'Failed to get tenant',
+      }),
+    };
+  }
+}
+
+/**
  * GET /admin/tenants
  * List all tenants with pagination
  */

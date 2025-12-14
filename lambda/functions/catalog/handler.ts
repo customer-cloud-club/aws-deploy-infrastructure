@@ -21,9 +21,9 @@
 
 import { APIGatewayProxyHandler, APIGatewayProxyResult, APIGatewayProxyEventQueryStringParameters } from 'aws-lambda';
 import { initializeDatabase } from '../../shared/db/index.js';
-import { listProducts, createProduct, updateProduct, deleteProduct } from './products.js';
-import { listPlans, createPlan, updatePlan, deletePlan } from './plans.js';
-import { listTenants, createTenant } from './tenants.js';
+import { getProduct, listProducts, createProduct, updateProduct, deleteProduct } from './products.js';
+import { getPlan, listPlans, createPlan, updatePlan, deletePlan } from './plans.js';
+import { getTenant, listTenants, createTenant } from './tenants.js';
 import { AdminCheckResult } from './types.js';
 
 /**
@@ -250,14 +250,8 @@ async function handleProductsRoute(
   switch (method) {
     case 'GET':
       if (resourceId) {
-        // GET /admin/products/{id} - Not implemented yet
-        return {
-          statusCode: 501,
-          body: JSON.stringify({
-            error: 'Not Implemented',
-            message: 'Get single product not implemented',
-          }),
-        };
+        // GET /admin/products/{id}
+        return getProduct(resourceId);
       }
       // GET /admin/products
       return listProducts(queryParams);
@@ -324,14 +318,8 @@ async function handlePlansRoute(
   switch (method) {
     case 'GET':
       if (resourceId) {
-        // GET /admin/plans/{id} - Not implemented yet
-        return {
-          statusCode: 501,
-          body: JSON.stringify({
-            error: 'Not Implemented',
-            message: 'Get single plan not implemented',
-          }),
-        };
+        // GET /admin/plans/{id}
+        return getPlan(resourceId);
       }
       // GET /admin/plans
       return listPlans(queryParams);
@@ -398,14 +386,8 @@ async function handleTenantsRoute(
   switch (method) {
     case 'GET':
       if (resourceId) {
-        // GET /admin/tenants/{id} - Not implemented yet
-        return {
-          statusCode: 501,
-          body: JSON.stringify({
-            error: 'Not Implemented',
-            message: 'Get single tenant not implemented',
-          }),
-        };
+        // GET /admin/tenants/{id}
+        return getTenant(resourceId);
       }
       // GET /admin/tenants
       return listTenants(queryParams);

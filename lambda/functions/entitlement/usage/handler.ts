@@ -89,9 +89,9 @@ export const handler: APIGatewayProxyHandler = async (event): Promise<APIGateway
         plan_limit: number;
       }>(
         `
-        UPDATE user_entitlements e
+        UPDATE entitlements e
         SET
-          usage_count = usage_count + $3,
+          usage_count = COALESCE(usage_count, 0) + $3,
           updated_at = NOW()
         FROM plans p
         WHERE e.user_id = $1
@@ -100,9 +100,9 @@ export const handler: APIGatewayProxyHandler = async (event): Promise<APIGateway
           AND e.plan_id = p.id
         RETURNING
           e.usage_count,
-          COALESCE(e.usage_limit, p.usage_limit) as usage_limit,
+          COALESCE(e.usage_limit, (p.metadata->>'usage_limit')::int) as usage_limit,
           e.soft_limit,
-          p.usage_limit as plan_limit
+          (p.metadata->>'usage_limit')::int as plan_limit
         `,
         [userId, product_id, count]
       );
@@ -129,15 +129,15 @@ export const handler: APIGatewayProxyHandler = async (event): Promise<APIGateway
       const softLimitRemaining = softLimit - usageCount;
       const overSoftLimit = softLimitRemaining < 0;
 
-      // Optional: Log usage event with metadata
+      // Optional: Log usage event to audit_logs
       if (metadata) {
         try {
           await client.query(
             `
-            INSERT INTO usage_events (user_id, product_id, count, metadata, created_at)
-            VALUES ($1, $2, $3, $4, NOW())
+            INSERT INTO audit_logs (table_name, record_id, action, new_data, user_id)
+            VALUES ('entitlements', (SELECT entitlement_id FROM entitlements WHERE user_id = $1 AND product_id = $2 AND status = 'active' LIMIT 1), 'UPDATE', $3, $1)
             `,
-            [userId, product_id, count, JSON.stringify(metadata)]
+            [userId, product_id, JSON.stringify({ usage_increment: count, metadata })]
           );
         } catch (error) {
           // Log error but don't fail the request
