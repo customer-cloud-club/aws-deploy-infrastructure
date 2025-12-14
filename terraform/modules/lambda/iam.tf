@@ -6,7 +6,7 @@
 # Lambda Execution Role
 # ---------------------------------------------------------
 resource "aws_iam_role" "lambda_exec" {
-  name_prefix = "${var.project_name}-lambda-exec-"
+  name_prefix = "${var.project_name}-${var.environment}-lambda-exec-"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -22,7 +22,7 @@ resource "aws_iam_role" "lambda_exec" {
   })
 
   tags = {
-    Name = "${var.project_name}-lambda-exec-role"
+    Name = "${var.project_name}-${var.environment}-lambda-exec-role"
   }
 }
 
@@ -54,7 +54,7 @@ resource "aws_iam_role_policy_attachment" "lambda_xray" {
 # RDS Access Policy
 # ---------------------------------------------------------
 resource "aws_iam_policy" "lambda_rds_access" {
-  name_prefix = "${var.project_name}-lambda-rds-"
+  name_prefix = "${var.project_name}-${var.environment}-lambda-rds-"
   description = "Allow Lambda functions to access RDS via RDS Proxy"
 
   policy = jsonencode({
@@ -73,7 +73,7 @@ resource "aws_iam_policy" "lambda_rds_access" {
   })
 
   tags = {
-    Name = "${var.project_name}-lambda-rds-policy"
+    Name = "${var.project_name}-${var.environment}-lambda-rds-policy"
   }
 }
 
@@ -86,7 +86,7 @@ resource "aws_iam_role_policy_attachment" "lambda_rds_access" {
 # ElastiCache (Redis) Access Policy
 # ---------------------------------------------------------
 resource "aws_iam_policy" "lambda_elasticache_access" {
-  name_prefix = "${var.project_name}-lambda-elasticache-"
+  name_prefix = "${var.project_name}-${var.environment}-lambda-elasticache-"
   description = "Allow Lambda functions to access ElastiCache"
 
   policy = jsonencode({
@@ -104,7 +104,7 @@ resource "aws_iam_policy" "lambda_elasticache_access" {
   })
 
   tags = {
-    Name = "${var.project_name}-lambda-elasticache-policy"
+    Name = "${var.project_name}-${var.environment}-lambda-elasticache-policy"
   }
 }
 
@@ -117,7 +117,7 @@ resource "aws_iam_role_policy_attachment" "lambda_elasticache_access" {
 # Secrets Manager Access Policy
 # ---------------------------------------------------------
 resource "aws_iam_policy" "lambda_secrets_access" {
-  name_prefix = "${var.project_name}-lambda-secrets-"
+  name_prefix = "${var.project_name}-${var.environment}-lambda-secrets-"
   description = "Allow Lambda functions to access Secrets Manager"
 
   policy = jsonencode({
@@ -147,7 +147,7 @@ resource "aws_iam_policy" "lambda_secrets_access" {
   })
 
   tags = {
-    Name = "${var.project_name}-lambda-secrets-policy"
+    Name = "${var.project_name}-${var.environment}-lambda-secrets-policy"
   }
 }
 
@@ -160,7 +160,7 @@ resource "aws_iam_role_policy_attachment" "lambda_secrets_access" {
 # CloudWatch Logs Policy (Custom - more restrictive)
 # ---------------------------------------------------------
 resource "aws_iam_policy" "lambda_logs" {
-  name_prefix = "${var.project_name}-lambda-logs-"
+  name_prefix = "${var.project_name}-${var.environment}-lambda-logs-"
   description = "Allow Lambda functions to write logs to CloudWatch"
 
   policy = jsonencode({
@@ -180,7 +180,7 @@ resource "aws_iam_policy" "lambda_logs" {
   })
 
   tags = {
-    Name = "${var.project_name}-lambda-logs-policy"
+    Name = "${var.project_name}-${var.environment}-lambda-logs-policy"
   }
 }
 
@@ -193,7 +193,7 @@ resource "aws_iam_role_policy_attachment" "lambda_logs" {
 # Network Interface Management (for VPC Lambda)
 # ---------------------------------------------------------
 resource "aws_iam_policy" "lambda_eni_management" {
-  name_prefix = "${var.project_name}-lambda-eni-"
+  name_prefix = "${var.project_name}-${var.environment}-lambda-eni-"
   description = "Allow Lambda to manage ENIs in VPC"
 
   policy = jsonencode({
@@ -214,7 +214,7 @@ resource "aws_iam_policy" "lambda_eni_management" {
   })
 
   tags = {
-    Name = "${var.project_name}-lambda-eni-policy"
+    Name = "${var.project_name}-${var.environment}-lambda-eni-policy"
   }
 }
 
@@ -229,7 +229,7 @@ resource "aws_iam_role_policy_attachment" "lambda_eni_management" {
 resource "aws_iam_policy" "lambda_sqs_access" {
   count = var.enable_sqs_integration ? 1 : 0
 
-  name_prefix = "${var.project_name}-lambda-sqs-"
+  name_prefix = "${var.project_name}-${var.environment}-lambda-sqs-"
   description = "Allow Lambda functions to interact with SQS"
 
   policy = jsonencode({
@@ -249,7 +249,7 @@ resource "aws_iam_policy" "lambda_sqs_access" {
   })
 
   tags = {
-    Name = "${var.project_name}-lambda-sqs-policy"
+    Name = "${var.project_name}-${var.environment}-lambda-sqs-policy"
   }
 }
 
@@ -266,7 +266,7 @@ resource "aws_iam_role_policy_attachment" "lambda_sqs_access" {
 resource "aws_iam_policy" "lambda_sns_publish" {
   count = var.enable_sns_integration ? 1 : 0
 
-  name_prefix = "${var.project_name}-lambda-sns-"
+  name_prefix = "${var.project_name}-${var.environment}-lambda-sns-"
   description = "Allow Lambda functions to publish to SNS topics"
 
   policy = jsonencode({
@@ -283,7 +283,7 @@ resource "aws_iam_policy" "lambda_sns_publish" {
   })
 
   tags = {
-    Name = "${var.project_name}-lambda-sns-policy"
+    Name = "${var.project_name}-${var.environment}-lambda-sns-policy"
   }
 }
 

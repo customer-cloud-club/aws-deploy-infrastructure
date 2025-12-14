@@ -7,6 +7,7 @@ import { APIGatewayProxyResult } from 'aws-lambda';
 import Stripe from 'stripe';
 import { query, transaction } from '../../shared/db/index.js';
 import { setCacheValue, getCacheValue, deleteCachePattern } from '../../shared/utils/redis.js';
+import { getStripeApiKey } from '../../shared/utils/secrets.js';
 import {
   PlanRow,
   PlanResponse,
@@ -19,12 +20,28 @@ import {
 } from './types.js';
 
 /**
- * Initialize Stripe client
+ * Lazily initialized Stripe client
  */
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2023-10-16',
-  typescript: true,
-});
+let stripeClient: Stripe | null = null;
+
+/**
+ * Get or initialize Stripe client
+ */
+async function getStripeClient(): Promise<Stripe> {
+  if (!stripeClient) {
+    const apiKey = await getStripeApiKey();
+    stripeClient = new Stripe(apiKey, {
+      apiVersion: '2023-10-16',
+      typescript: true,
+      appInfo: {
+        name: 'CCAGI Catalog Service',
+        version: '1.0.0',
+      },
+    });
+    console.log('[Plans] Stripe client initialized');
+  }
+  return stripeClient;
+}
 
 /**
  * Converts PlanRow to PlanResponse
@@ -87,6 +104,9 @@ async function createStripePrice(
       currency: request.currency,
     });
 
+    // Get Stripe client
+    const stripe = await getStripeClient();
+
     // Determine recurring interval for Stripe
     let recurring: Stripe.PriceCreateParams.Recurring | undefined;
     if (request.billing_period === 'monthly') {
@@ -140,15 +160,19 @@ export async function listPlans(
       ? `${CatalogCacheKeys.productPlans(productId)}:page:${page}:per_page:${per_page}`
       : `catalog:plans:all:page:${page}:per_page:${per_page}`;
 
-    // Check cache
-    const cached = await getCacheValue<ListResponse<PlanResponse>>(cacheKey);
-    if (cached) {
-      console.log('[Plans] Cache hit for list');
-      return {
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json', 'X-Cache': 'HIT' },
-        body: JSON.stringify(cached),
-      };
+    // Check cache (graceful - don't fail if Redis is unavailable)
+    try {
+      const cached = await getCacheValue<ListResponse<PlanResponse>>(cacheKey);
+      if (cached) {
+        console.log('[Plans] Cache hit for list');
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json', 'X-Cache': 'HIT' },
+          body: JSON.stringify(cached),
+        };
+      }
+    } catch (cacheError) {
+      console.warn('[Plans] Cache read failed, continuing without cache:', cacheError);
     }
 
     // Build query
@@ -181,8 +205,12 @@ export async function listPlans(
       has_more: hasMore,
     };
 
-    // Cache response
-    await setCacheValue(cacheKey, response, CatalogCacheTTL.PLAN);
+    // Cache response (graceful - don't fail if Redis is unavailable)
+    try {
+      await setCacheValue(cacheKey, response, CatalogCacheTTL.PLAN);
+    } catch (cacheError) {
+      console.warn('[Plans] Cache write failed, continuing without cache:', cacheError);
+    }
 
     return {
       statusCode: 200,
@@ -419,6 +447,7 @@ export async function deletePlan(planId: string): Promise<APIGatewayProxyResult>
 
       // Archive Stripe Price
       try {
+        const stripe = await getStripeClient();
         await stripe.prices.update(plan.stripe_price_id, {
           active: false,
         });

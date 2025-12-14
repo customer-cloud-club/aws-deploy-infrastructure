@@ -2,7 +2,11 @@
  * Catalog Service Lambda Handler
  * Manages products, plans, and tenants
  *
- * Endpoints:
+ * Public Endpoints (no auth required):
+ * - GET    /catalog/products        - List products (public)
+ * - GET    /catalog/plans           - List plans (public)
+ *
+ * Admin Endpoints (admin auth required):
  * - GET    /admin/products          - List products
  * - POST   /admin/products          - Create product
  * - PUT    /admin/products/{id}     - Update product
@@ -24,18 +28,45 @@ import { AdminCheckResult } from './types.js';
 
 /**
  * Check if user has admin role
+ * Checks multiple sources: custom:role claim, Cognito groups, or authorizer role
  */
 function checkAdminRole(event: Parameters<APIGatewayProxyHandler>[0]): AdminCheckResult {
   const authorizer = event.requestContext?.authorizer;
+  const claims = authorizer?.['claims'] || {};
 
-  // Get role from authorizer (Cognito custom claims or Lambda authorizer)
-  const role = authorizer?.['claims']?.['custom:role'] || authorizer?.['role'];
-  const userId = authorizer?.['claims']?.['sub'] || authorizer?.['user_id'];
+  // Get role from multiple sources
+  const customRole = claims['custom:role'];
+  const authorizerRole = authorizer?.['role'];
 
-  console.log('[Auth] Role check:', { role, userId });
+  // Check Cognito groups (added to ID token by Cognito)
+  // Groups can be a string (single group) or an array (multiple groups)
+  const cognitoGroups = claims['cognito:groups'];
+  const groups: string[] = cognitoGroups
+    ? (typeof cognitoGroups === 'string' ? [cognitoGroups] : cognitoGroups)
+    : [];
+
+  const isInAdminGroup = groups.includes('admin');
+
+  // User is admin if any of these conditions are true:
+  // 1. custom:role claim is 'admin'
+  // 2. User is in 'admin' Cognito group
+  // 3. authorizer role is 'admin'
+  const isAdmin = customRole === 'admin' || isInAdminGroup || authorizerRole === 'admin';
+  const role = customRole || (isInAdminGroup ? 'admin' : authorizerRole);
+
+  const userId = claims['sub'] || authorizer?.['user_id'];
+
+  console.log('[Auth] Role check:', {
+    customRole,
+    authorizerRole,
+    groups,
+    isInAdminGroup,
+    isAdmin,
+    userId
+  });
 
   return {
-    is_admin: role === 'admin',
+    is_admin: isAdmin,
     role,
     user_id: userId,
   };
@@ -57,14 +88,23 @@ function extractResourceId(path: string): string | null {
 /**
  * Determines resource type from path
  * Example: /admin/products -> 'products'
+ * Example: /catalog/products -> 'products'
  */
 function getResourceType(path: string): string | null {
   const parts = path.split('/').filter(Boolean);
-  // Expected: ['admin', 'products', ...]
-  if (parts.length >= 2 && parts[0] === 'admin') {
+  // Expected: ['admin', 'products', ...] or ['catalog', 'products', ...]
+  if (parts.length >= 2 && (parts[0] === 'admin' || parts[0] === 'catalog')) {
     return parts[1] || null;
   }
   return null;
+}
+
+/**
+ * Checks if path is a public catalog path (no auth required)
+ */
+function isPublicCatalogPath(path: string): boolean {
+  const parts = path.split('/').filter(Boolean);
+  return parts[0] === 'catalog';
 }
 
 /**
@@ -93,21 +133,37 @@ export const handler: APIGatewayProxyHandler = async (event): Promise<APIGateway
     // Initialize database connection (reused across invocations)
     await initializeDatabase();
 
-    // Check admin authorization
-    const authCheck = checkAdminRole(event);
-    if (!authCheck.is_admin) {
+    const method = event.httpMethod;
+    const path = event.path || '';
+    const isPublic = isPublicCatalogPath(path);
+
+    // Check admin authorization for non-public paths
+    if (!isPublic) {
+      const authCheck = checkAdminRole(event);
+      if (!authCheck.is_admin) {
+        return {
+          statusCode: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            error: 'Forbidden',
+            message: 'Admin role required',
+          }),
+        };
+      }
+    }
+
+    // Public catalog paths only allow GET requests
+    if (isPublic && method !== 'GET') {
       return {
-        statusCode: 403,
+        statusCode: 405,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          error: 'Forbidden',
-          message: 'Admin role required',
+          error: 'Method Not Allowed',
+          message: 'Only GET requests are allowed for public catalog',
         }),
       };
     }
 
-    const method = event.httpMethod;
-    const path = event.path || '';
     const resourceType = getResourceType(path);
     const resourceId = extractResourceId(path);
 
@@ -116,7 +172,7 @@ export const handler: APIGatewayProxyHandler = async (event): Promise<APIGateway
       path,
       resourceType,
       resourceId,
-      userId: authCheck.user_id,
+      isPublic,
     });
 
     let result: APIGatewayProxyResult;

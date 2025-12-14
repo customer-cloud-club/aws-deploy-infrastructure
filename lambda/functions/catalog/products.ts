@@ -68,16 +68,21 @@ export async function listProducts(
   try {
     const { page, per_page, offset } = parsePaginationParams(queryParams);
 
-    // Check cache
+    // Check cache (graceful - don't fail if Redis is unavailable)
     const cacheKey = `${CatalogCacheKeys.products()}:page:${page}:per_page:${per_page}`;
-    const cached = await getCacheValue<ListResponse<ProductResponse>>(cacheKey);
-    if (cached) {
-      console.log('[Products] Cache hit for list');
-      return {
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json', 'X-Cache': 'HIT' },
-        body: JSON.stringify(cached),
-      };
+    let cached: ListResponse<ProductResponse> | null = null;
+    try {
+      cached = await getCacheValue<ListResponse<ProductResponse>>(cacheKey);
+      if (cached) {
+        console.log('[Products] Cache hit for list');
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json', 'X-Cache': 'HIT' },
+          body: JSON.stringify(cached),
+        };
+      }
+    } catch (cacheError) {
+      console.warn('[Products] Cache read failed, continuing without cache:', cacheError);
     }
 
     // Get total count
@@ -106,8 +111,12 @@ export async function listProducts(
       has_more: hasMore,
     };
 
-    // Cache response
-    await setCacheValue(cacheKey, response, CatalogCacheTTL.PRODUCT);
+    // Cache response (graceful - don't fail if Redis is unavailable)
+    try {
+      await setCacheValue(cacheKey, response, CatalogCacheTTL.PRODUCT);
+    } catch (cacheError) {
+      console.warn('[Products] Cache write failed, continuing without cache:', cacheError);
+    }
 
     return {
       statusCode: 200,

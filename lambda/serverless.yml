@@ -1,0 +1,209 @@
+service: auth-billing
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ap-northeast-1
+  stage: ${opt:stage, 'dev'}
+  memorySize: ${self:custom.env.lambda.memorySize, 256}
+  timeout: ${self:custom.env.lambda.timeout, 30}
+
+  # VPC configuration from environment file
+  vpc:
+    securityGroupIds: ${self:custom.env.vpc.securityGroupIds}
+    subnetIds: ${self:custom.env.vpc.subnetIds}
+
+  environment:
+    ENVIRONMENT: ${self:provider.stage}
+    LOG_LEVEL: ${self:custom.env.logging.level, 'info'}
+    DB_SECRET_ARN: ${self:custom.env.database.secretArn}
+    RDS_PROXY_ENDPOINT: ${self:custom.env.database.proxyEndpoint}
+    REDIS_ENDPOINT: ${self:custom.env.redis.endpoint}
+    REDIS_PORT: ${self:custom.env.redis.port}
+    COGNITO_USER_POOL_ID: ${self:custom.env.cognito.userPoolId}
+    COGNITO_USER_POOL_ARN: ${self:custom.env.cognito.userPoolArn}
+    STRIPE_API_KEY_ARN: ${self:custom.env.stripe.apiKeyArn}
+    STRIPE_WEBHOOK_SECRET_ARN: ${self:custom.env.stripe.webhookSecretArn}
+
+  iam:
+    role:
+      statements:
+        # Secrets Manager access
+        - Effect: Allow
+          Action:
+            - secretsmanager:GetSecretValue
+          Resource:
+            - ${self:custom.env.database.secretArn}
+            - ${self:custom.env.stripe.apiKeyArn}
+            - ${self:custom.env.stripe.webhookSecretArn}
+        # VPC ENI management
+        - Effect: Allow
+          Action:
+            - ec2:CreateNetworkInterface
+            - ec2:DescribeNetworkInterfaces
+            - ec2:DeleteNetworkInterface
+            - ec2:AssignPrivateIpAddresses
+            - ec2:UnassignPrivateIpAddresses
+          Resource: '*'
+        # CloudWatch Logs
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: 'arn:aws:logs:${self:provider.region}:*:*'
+        # X-Ray tracing
+        - Effect: Allow
+          Action:
+            - xray:PutTraceSegments
+            - xray:PutTelemetryRecords
+          Resource: '*'
+
+custom:
+  # Load environment-specific configuration
+  env: ${file(./envs/${self:provider.stage}.yml)}
+
+package:
+  individually: false
+  patterns:
+    - '!**'
+    - 'dist/functions/**'
+    - 'dist/shared/**'
+    - 'node_modules/**'
+    - 'package.json'
+
+functions:
+  # Auth functions (Cognito triggers)
+  authPreSignup:
+    handler: dist/functions/auth/pre-signup/handler.handler
+    memorySize: 256
+    timeout: 10
+    vpc: ~  # No VPC for Cognito trigger
+    events: []
+
+  authPostConfirmation:
+    handler: dist/functions/auth/post-confirmation/handler.handler
+    memorySize: 256
+    timeout: 30
+    events: []
+
+  authPreToken:
+    handler: dist/functions/auth/pre-token/handler.handler
+    memorySize: 512
+    timeout: 10
+    vpc: ~  # No VPC for Cognito trigger
+    events: []
+
+  # Catalog API (products, plans, tenants)
+  catalog:
+    handler: dist/functions/catalog/handler.handler
+    memorySize: 512
+    timeout: 60
+    events:
+      - http:
+          path: catalog/{proxy+}
+          method: any
+          cors: true
+      - http:
+          path: admin/{proxy+}
+          method: any
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: !Ref ApiGatewayAuthorizer
+
+  # Entitlement check
+  entitlementCheck:
+    handler: dist/functions/entitlement/check/handler.handler
+    memorySize: 256
+    timeout: 30
+    events:
+      - http:
+          path: me/entitlements
+          method: get
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: !Ref ApiGatewayAuthorizer
+
+  # Usage recorder
+  usageRecorder:
+    handler: dist/functions/entitlement/usage/handler.handler
+    memorySize: 512
+    timeout: 60
+    events:
+      - http:
+          path: me/usage
+          method: post
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: !Ref ApiGatewayAuthorizer
+
+  # Checkout handler
+  checkoutHandler:
+    handler: dist/functions/billing/checkout/handler.handler
+    memorySize: 256
+    timeout: 30
+    events:
+      - http:
+          path: checkout
+          method: post
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: !Ref ApiGatewayAuthorizer
+      - http:
+          path: subscriptions/{proxy+}
+          method: any
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: !Ref ApiGatewayAuthorizer
+
+  # Stripe webhook processor
+  webhookProcessor:
+    handler: dist/functions/billing/webhook/handler.handler
+    memorySize: 512
+    timeout: 60
+    events:
+      - http:
+          path: webhooks/stripe
+          method: post
+          cors: true
+
+  # Database migration (invoke directly, no HTTP endpoint)
+  migration:
+    handler: dist/functions/migration/handler.handler
+    memorySize: 512
+    timeout: 300
+    events: []  # No HTTP events - invoke directly via CLI
+
+resources:
+  Resources:
+    # Cognito Authorizer for API Gateway
+    ApiGatewayAuthorizer:
+      Type: AWS::ApiGateway::Authorizer
+      Properties:
+        Name: CognitoAuthorizer
+        Type: COGNITO_USER_POOLS
+        IdentitySource: method.request.header.Authorization
+        RestApiId: !Ref ApiGatewayRestApi
+        ProviderARNs:
+          - ${self:custom.env.cognito.userPoolArn}
+
+  Outputs:
+    ApiGatewayRestApiId:
+      Value: !Ref ApiGatewayRestApi
+      Export:
+        Name: ${self:service}-${self:provider.stage}-api-id
+
+    ApiGatewayRestApiEndpoint:
+      Value: !Sub 'https://${ApiGatewayRestApi}.execute-api.${self:provider.region}.amazonaws.com/${self:provider.stage}'
+      Export:
+        Name: ${self:service}-${self:provider.stage}-api-endpoint
+
+plugins:
+  - serverless-offline

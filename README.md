@@ -185,6 +185,135 @@ terraform init
 terraform apply
 ```
 
+---
+
+## デプロイ方法
+
+### 前提条件
+
+- AWS CLI 設定済み
+- Terraform >= 1.0
+- Node.js >= 20.x
+- npm または yarn
+
+### 1. インフラストラクチャのデプロイ（Terraform）
+
+```bash
+# 開発環境
+cd terraform/envs/dev
+terraform init
+terraform plan
+terraform apply
+
+# 本番環境
+cd terraform/envs/prod
+terraform init
+terraform plan
+terraform apply
+```
+
+**主要リソース:**
+- VPC（3層アーキテクチャ: Public/Private/Database subnets）
+- Aurora PostgreSQL Serverless v2
+- ElastiCache Redis
+- RDS Proxy
+- Cognito User Pool
+- API Gateway + WAF
+- CloudFront
+- Lambda関数（Terraformでデプロイ済み）
+
+### 2. Lambda関数のデプロイ（Serverless Framework）
+
+Serverless Frameworkを使用して環境別にデプロイできます。
+
+```bash
+cd lambda
+
+# 依存関係のインストール
+npm install
+
+# TypeScriptビルド
+npm run build
+
+# 開発環境にデプロイ
+npx serverless deploy --stage dev
+
+# ステージング環境にデプロイ
+npx serverless deploy --stage staging
+
+# 本番環境にデプロイ
+npx serverless deploy --stage prod
+```
+
+### 3. 環境設定ファイル
+
+`lambda/envs/` ディレクトリに環境別の設定があります：
+
+```
+lambda/envs/
+├── dev.yml      # 開発環境
+├── staging.yml  # ステージング環境
+└── prod.yml     # 本番環境
+```
+
+**設定例（dev.yml）:**
+```yaml
+vpc:
+  id: vpc-xxxxxxxxx
+  securityGroupIds:
+    - sg-xxxxxxxxx
+  subnetIds:
+    - subnet-xxxxxxxxx
+    - subnet-xxxxxxxxx
+
+database:
+  secretArn: arn:aws:secretsmanager:...
+  proxyEndpoint: xxx-rds-proxy.proxy-xxx.ap-northeast-1.rds.amazonaws.com
+
+redis:
+  endpoint: master.xxx-redis.xxx.apne1.cache.amazonaws.com
+  port: 6379
+
+cognito:
+  userPoolId: ap-northeast-1_xxxxxxxxx
+  userPoolArn: arn:aws:cognito-idp:...
+
+stripe:
+  apiKeyArn: arn:aws:secretsmanager:...
+  webhookSecretArn: arn:aws:secretsmanager:...
+
+logging:
+  level: debug  # dev: debug, staging: info, prod: warn
+
+lambda:
+  memorySize: 256
+  timeout: 30
+```
+
+### 4. デプロイ後の確認
+
+```bash
+# Terraform出力の確認
+cd terraform/envs/dev
+terraform output
+
+# 主要エンドポイント
+# - api_gateway_invoke_url: API Gateway URL
+# - cloudfront_domain_name: CloudFront URL
+# - cognito_user_pool_id: Cognito User Pool ID
+```
+
+### 5. ローカル開発
+
+```bash
+cd lambda
+
+# Serverless Offline でローカル実行
+npx serverless offline --stage dev
+
+# API: http://localhost:3000
+```
+
 ## 設定例
 
 ### 最小構成（フロントエンドのみ）

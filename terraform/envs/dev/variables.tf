@@ -5,11 +5,6 @@ variable "aws_region" {
   default     = "ap-northeast-1"
 }
 
-variable "vpc_id" {
-  description = "VPC ID where resources will be deployed"
-  type        = string
-}
-
 # Aurora Variables
 variable "aurora_instance_count" {
   description = "Number of Aurora instances"

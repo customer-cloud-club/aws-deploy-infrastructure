@@ -45,6 +45,11 @@ output "admin_api_arn" {
   value       = aws_lambda_function.admin_api.arn
 }
 
+output "catalog_arn" {
+  description = "ARN of catalog Lambda function"
+  value       = aws_lambda_function.catalog.arn
+}
+
 # ---------------------------------------------------------
 # Lambda Functions - Function Names
 # ---------------------------------------------------------
@@ -88,6 +93,11 @@ output "admin_api_name" {
   value       = aws_lambda_function.admin_api.function_name
 }
 
+output "catalog_name" {
+  description = "Name of catalog Lambda function"
+  value       = aws_lambda_function.catalog.function_name
+}
+
 # ---------------------------------------------------------
 # Lambda Functions - Invoke ARNs (for API Gateway)
 # ---------------------------------------------------------
@@ -114,6 +124,11 @@ output "checkout_handler_invoke_arn" {
 output "admin_api_invoke_arn" {
   description = "Invoke ARN of admin-api Lambda function for API Gateway"
   value       = aws_lambda_function.admin_api.invoke_arn
+}
+
+output "catalog_invoke_arn" {
+  description = "Invoke ARN of catalog Lambda function for API Gateway"
+  value       = aws_lambda_function.catalog.invoke_arn
 }
 
 # ---------------------------------------------------------
@@ -159,6 +174,11 @@ output "admin_api_alias_arn" {
   value       = aws_lambda_alias.admin_api_live.arn
 }
 
+output "catalog_alias_arn" {
+  description = "ARN of catalog Lambda alias"
+  value       = aws_lambda_alias.catalog_live.arn
+}
+
 # ---------------------------------------------------------
 # IAM Role
 # ---------------------------------------------------------
@@ -194,6 +214,7 @@ output "log_groups" {
     webhook_processor       = aws_cloudwatch_log_group.lambda_logs["webhook-processor"].name
     checkout_handler        = aws_cloudwatch_log_group.lambda_logs["checkout-handler"].name
     admin_api               = aws_cloudwatch_log_group.lambda_logs["admin-api"].name
+    catalog                 = aws_cloudwatch_log_group.lambda_logs["catalog"].name
   }
 }
 
@@ -262,6 +283,12 @@ output "lambda_functions" {
       arn          = aws_lambda_function.admin_api.arn
       name         = aws_lambda_function.admin_api.function_name
       invoke_arn   = aws_lambda_function.admin_api.invoke_arn
+      vpc_enabled  = true
+    }
+    catalog = {
+      arn          = aws_lambda_function.catalog.arn
+      name         = aws_lambda_function.catalog.function_name
+      invoke_arn   = aws_lambda_function.catalog.invoke_arn
       vpc_enabled  = true
     }
   }

@@ -3,16 +3,17 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '@/lib/store';
-import { signOutUser } from '@/lib/auth';
+import { useAuth } from '@/components/providers/AuthProvider';
 import Button from '@/components/ui/Button';
 
 const Header: React.FC = () => {
   const { t } = useTranslation('common');
-  const { user, theme, setTheme } = useStore();
+  const { theme, setTheme } = useStore();
+  const { user, logout } = useAuth();
 
   const handleSignOut = async () => {
     try {
-      await signOutUser();
+      await logout();
       window.location.href = '/login';
     } catch (error) {
       console.error('Sign out error:', error);
@@ -55,8 +56,8 @@ const Header: React.FC = () => {
 
           <div className="flex items-center gap-3">
             <div className="text-sm text-right">
-              <p className="font-medium">{user?.name || 'Admin User'}</p>
-              <p className="text-muted-foreground">{user?.email || 'admin@example.com'}</p>
+              <p className="font-medium">{user?.username || 'Admin User'}</p>
+              <p className="text-muted-foreground text-xs">{user?.signInDetails?.loginId || ''}</p>
             </div>
             <Button variant="ghost" size="sm" onClick={handleSignOut}>
               {t('auth.signOut')}

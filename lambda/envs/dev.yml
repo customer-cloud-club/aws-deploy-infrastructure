@@ -1,0 +1,41 @@
+# Development Environment Configuration
+# Updated: 2024-12-14
+# VPC: auth-billing-dev (newly created via Terraform)
+
+# VPC Configuration
+vpc:
+  id: vpc-0646fc014c19002f7
+  securityGroupIds:
+    - sg-01947cfd91ce864de  # auth-billing-dev-lambda-app-sg (allows RDS Proxy access)
+  subnetIds:
+    - subnet-05015da1251e33b6a  # auth-billing-dev-private-ap-northeast-1a
+    - subnet-04d435f70ed38220b  # auth-billing-dev-private-ap-northeast-1c
+
+# Database Configuration
+database:
+  secretArn: arn:aws:secretsmanager:ap-northeast-1:805673386383:secret:auth-billing-dev/aurora/credentials-ATrkV7
+  proxyEndpoint: auth-billing-dev-rds-proxy.proxy-c9yyeaq0wwjd.ap-northeast-1.rds.amazonaws.com
+
+# Redis Configuration
+redis:
+  endpoint: master.auth-billing-dev-redis.fdnce1.apne1.cache.amazonaws.com
+  port: 6379
+
+# Cognito Configuration
+cognito:
+  userPoolId: ap-northeast-1_lSPtvbFS7
+  userPoolArn: arn:aws:cognito-idp:ap-northeast-1:805673386383:userpool/ap-northeast-1_lSPtvbFS7
+
+# Stripe Configuration
+stripe:
+  apiKeyArn: arn:aws:secretsmanager:ap-northeast-1:805673386383:secret:auth-billing-dev/stripe/api-key-4oh3xl
+  webhookSecretArn: arn:aws:secretsmanager:ap-northeast-1:805673386383:secret:auth-billing-dev/stripe/webhook-secret-bkVpQk
+
+# Logging Configuration
+logging:
+  level: debug
+
+# Lambda Configuration
+lambda:
+  memorySize: 256
+  timeout: 30

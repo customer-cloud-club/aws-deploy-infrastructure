@@ -6,20 +6,21 @@ import { signIn, signOut, getCurrentUser, fetchAuthSession } from 'aws-amplify/a
  * These values should be set via environment variables
  */
 export function configureAmplify() {
+  const userPoolId = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID || process.env.NEXT_PUBLIC_USER_POOL_ID || '';
+  const clientId = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || process.env.NEXT_PUBLIC_USER_POOL_CLIENT_ID || '';
+  const region = process.env.NEXT_PUBLIC_COGNITO_REGION || 'ap-northeast-1';
+
+  if (!userPoolId || !clientId) {
+    console.warn('Cognito configuration missing. Please set NEXT_PUBLIC_COGNITO_USER_POOL_ID and NEXT_PUBLIC_COGNITO_CLIENT_ID');
+    return;
+  }
+
   Amplify.configure({
     Auth: {
       Cognito: {
-        userPoolId: process.env.NEXT_PUBLIC_USER_POOL_ID || '',
-        userPoolClientId: process.env.NEXT_PUBLIC_USER_POOL_CLIENT_ID || '',
-        identityPoolId: process.env.NEXT_PUBLIC_IDENTITY_POOL_ID || '',
+        userPoolId,
+        userPoolClientId: clientId,
         loginWith: {
-          oauth: {
-            domain: process.env.NEXT_PUBLIC_OAUTH_DOMAIN || '',
-            scopes: ['openid', 'email', 'profile'],
-            redirectSignIn: [process.env.NEXT_PUBLIC_REDIRECT_SIGN_IN || 'http://localhost:3000'],
-            redirectSignOut: [process.env.NEXT_PUBLIC_REDIRECT_SIGN_OUT || 'http://localhost:3000'],
-            responseType: 'code',
-          },
           email: true,
         },
       },

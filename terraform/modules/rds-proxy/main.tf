@@ -20,7 +20,7 @@ resource "aws_db_proxy" "main" {
 
   auth {
     auth_scheme = "SECRETS"
-    iam_auth    = "REQUIRED"
+    iam_auth    = "DISABLED"  # Password auth via Secrets Manager
     secret_arn  = var.db_secret_arn
   }
 

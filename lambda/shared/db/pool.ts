@@ -65,7 +65,7 @@ export function createPool(config: DatabaseConfig): Pool {
     },
     // Lambda-specific optimizations
     allowExitOnIdle: true, // Allow pool to close when idle
-    statement_timeout: 30000, // 30 seconds query timeout
+    // NOTE: statement_timeout is NOT supported by RDS Proxy
   };
 
   const newPool = new Pool(poolConfig);

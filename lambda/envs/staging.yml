@@ -1,0 +1,41 @@
+# Staging Environment Configuration
+# Updated: 2024-12-14
+# TODO: Update values after Terraform apply for staging environment
+
+# VPC Configuration
+vpc:
+  id: vpc-STAGING_VPC_ID  # TODO: Update after terraform apply
+  securityGroupIds:
+    - sg-STAGING_LAMBDA_SG_ID  # TODO: Update after terraform apply
+  subnetIds:
+    - subnet-STAGING_PRIVATE_SUBNET_1  # TODO: Update after terraform apply
+    - subnet-STAGING_PRIVATE_SUBNET_2  # TODO: Update after terraform apply
+
+# Database Configuration
+database:
+  secretArn: arn:aws:secretsmanager:ap-northeast-1:805673386383:secret:auth-billing-staging/aurora/credentials-XXXXXX
+  proxyEndpoint: auth-billing-staging-rds-proxy.proxy-XXXXXX.ap-northeast-1.rds.amazonaws.com
+
+# Redis Configuration
+redis:
+  endpoint: master.auth-billing-staging-redis.XXXXXX.apne1.cache.amazonaws.com
+  port: 6379
+
+# Cognito Configuration
+cognito:
+  userPoolId: ap-northeast-1_STAGING_POOL_ID
+  userPoolArn: arn:aws:cognito-idp:ap-northeast-1:805673386383:userpool/ap-northeast-1_STAGING_POOL_ID
+
+# Stripe Configuration
+stripe:
+  apiKeyArn: arn:aws:secretsmanager:ap-northeast-1:805673386383:secret:auth-billing-staging/stripe/api-key-XXXXXX
+  webhookSecretArn: arn:aws:secretsmanager:ap-northeast-1:805673386383:secret:auth-billing-staging/stripe/webhook-secret-XXXXXX
+
+# Logging Configuration
+logging:
+  level: info
+
+# Lambda Configuration
+lambda:
+  memorySize: 512
+  timeout: 30

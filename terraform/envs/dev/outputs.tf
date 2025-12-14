@@ -79,26 +79,21 @@ output "waf_web_acl_arn" {
   value       = module.waf.web_acl_arn
 }
 
-# Lambda Outputs
-output "lambda_entitlement_check_arn" {
-  description = "Lambda entitlement check function ARN"
-  value       = module.lambda.entitlement_check_arn
-}
-
+# Lambda Security Group (used by Serverless Framework)
 output "lambda_security_group_id" {
-  description = "Lambda security group ID"
-  value       = module.lambda.lambda_security_group_id
+  description = "Lambda security group ID (for Serverless Framework)"
+  value       = aws_security_group.lambda_app.id
 }
 
-# API Gateway Outputs
+# API Gateway Outputs (Serverless Framework managed)
 output "api_gateway_id" {
-  description = "API Gateway REST API ID"
-  value       = module.api_gateway.api_id
+  description = "API Gateway REST API ID (Serverless managed)"
+  value       = data.aws_api_gateway_rest_api.serverless.id
 }
 
 output "api_gateway_invoke_url" {
-  description = "API Gateway invoke URL"
-  value       = module.api_gateway.api_endpoint
+  description = "API Gateway invoke URL (Serverless managed)"
+  value       = "https://${data.aws_api_gateway_rest_api.serverless.id}.execute-api.ap-northeast-1.amazonaws.com/${data.aws_api_gateway_stage.serverless.stage_name}"
 }
 
 # CloudFront Outputs
@@ -139,15 +134,25 @@ output "redis_auth_token_secret_arn" {
 # Network Information
 output "vpc_id" {
   description = "VPC ID"
-  value       = data.aws_vpc.main.id
+  value       = module.vpc.vpc_id
 }
 
 output "private_subnet_ids" {
   description = "Private subnet IDs"
-  value       = data.aws_subnets.private.ids
+  value       = module.vpc.private_subnet_ids
 }
 
 output "public_subnet_ids" {
   description = "Public subnet IDs"
-  value       = data.aws_subnets.public.ids
+  value       = module.vpc.public_subnet_ids
+}
+
+output "database_subnet_ids" {
+  description = "Database subnet IDs"
+  value       = module.vpc.database_subnet_ids
+}
+
+output "nat_gateway_id" {
+  description = "NAT Gateway ID"
+  value       = module.vpc.nat_gateway_id
 }

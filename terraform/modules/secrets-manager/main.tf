@@ -4,7 +4,7 @@
 
 # Stripe API Key
 resource "aws_secretsmanager_secret" "stripe_api_key" {
-  name        = "${var.project_name}/stripe/api-key"
+  name        = "${var.project_name}-${var.environment}/stripe/api-key"
   description = "Stripe API Key for payment processing"
 
   recovery_window_in_days = var.recovery_window_in_days
@@ -29,7 +29,7 @@ resource "aws_secretsmanager_secret_version" "stripe_api_key" {
 
 # Stripe Webhook Secret
 resource "aws_secretsmanager_secret" "stripe_webhook_secret" {
-  name        = "${var.project_name}/stripe/webhook-secret"
+  name        = "${var.project_name}-${var.environment}/stripe/webhook-secret"
   description = "Stripe Webhook Secret for signature verification"
 
   recovery_window_in_days = var.recovery_window_in_days
@@ -54,7 +54,7 @@ resource "aws_secretsmanager_secret_version" "stripe_webhook_secret" {
 
 # Aurora DB Credentials
 resource "aws_secretsmanager_secret" "db_credentials" {
-  name        = "${var.project_name}/aurora/credentials"
+  name        = "${var.project_name}-${var.environment}/aurora/credentials"
   description = "Aurora PostgreSQL master credentials"
 
   recovery_window_in_days = var.recovery_window_in_days
@@ -86,7 +86,7 @@ resource "aws_secretsmanager_secret_version" "db_credentials" {
 
 # Redis AUTH Token
 resource "aws_secretsmanager_secret" "redis_auth" {
-  name        = "${var.project_name}/redis/auth-token"
+  name        = "${var.project_name}-${var.environment}/redis/auth-token"
   description = "Redis AUTH token for ElastiCache cluster"
 
   recovery_window_in_days = var.recovery_window_in_days
@@ -111,7 +111,7 @@ resource "aws_secretsmanager_secret_version" "redis_auth" {
 
 # Cognito Client Secret
 resource "aws_secretsmanager_secret" "cognito_client_secret" {
-  name        = "${var.project_name}/cognito/client-secret"
+  name        = "${var.project_name}-${var.environment}/cognito/client-secret"
   description = "Cognito User Pool Client Secret"
 
   recovery_window_in_days = var.recovery_window_in_days
@@ -190,14 +190,14 @@ data "aws_iam_policy_document" "secrets_access" {
 }
 
 resource "aws_iam_policy" "secrets_access" {
-  name        = "${var.project_name}-secrets-access-policy"
+  name        = "${var.project_name}-${var.environment}-secrets-access-policy"
   description = "IAM policy for accessing Secrets Manager secrets"
   policy      = data.aws_iam_policy_document.secrets_access.json
 
   tags = merge(
     var.tags,
     {
-      Name = "${var.project_name}-secrets-access-policy"
+      Name = "${var.project_name}-${var.environment}-secrets-access-policy"
     }
   )
 }

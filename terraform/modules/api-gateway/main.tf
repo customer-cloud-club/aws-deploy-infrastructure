@@ -185,12 +185,15 @@ resource "aws_lambda_permission" "api_gateway" {
 # CORS設定 (OPTIONS メソッド)
 locals {
   cors_resources = {
-    auth            = aws_api_gateway_resource.auth.id
-    me_entitlements = aws_api_gateway_resource.me_entitlements.id
-    me_usage        = aws_api_gateway_resource.me_usage.id
-    checkout        = aws_api_gateway_resource.checkout.id
-    subscriptions   = aws_api_gateway_resource.subscriptions.id
-    catalog         = aws_api_gateway_resource.catalog.id
+    auth              = aws_api_gateway_resource.auth.id
+    me_entitlements   = aws_api_gateway_resource.me_entitlements.id
+    me_usage          = aws_api_gateway_resource.me_usage.id
+    checkout          = aws_api_gateway_resource.checkout.id
+    subscriptions     = aws_api_gateway_resource.subscriptions.id
+    catalog           = aws_api_gateway_resource.catalog.id
+    admin             = aws_api_gateway_resource.admin.id
+    admin_proxy       = aws_api_gateway_resource.admin_proxy.id
+    catalog_proxy     = aws_api_gateway_resource.catalog_proxy.id
   }
 }
 

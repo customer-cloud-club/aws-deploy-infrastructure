@@ -55,38 +55,19 @@ locals {
   }
 }
 
-# VPC (既存を参照または新規作成)
-data "aws_vpc" "main" {
-  id = var.vpc_id
-}
+# VPC (新規作成)
+module "vpc" {
+  source = "../../modules/vpc"
 
-data "aws_subnets" "private" {
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.main.id]
-  }
-  filter {
-    name   = "tag:Tier"
-    values = ["private"]
-  }
-}
-
-data "aws_subnets" "public" {
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.main.id]
-  }
-  filter {
-    name   = "tag:Tier"
-    values = ["public"]
-  }
+  project_name = local.project_name
+  environment  = local.environment
 }
 
 # Lambda Security Group (created first for RDS Proxy dependency)
 resource "aws_security_group" "lambda_app" {
   name        = "${local.project_name}-${local.environment}-lambda-app-sg"
   description = "Security group for Lambda functions"
-  vpc_id      = data.aws_vpc.main.id
+  vpc_id      = module.vpc.vpc_id
 
   egress {
     from_port   = 0
@@ -155,8 +136,8 @@ module "aurora" {
 
   project_name          = local.project_name
   environment           = local.environment
-  vpc_id                = data.aws_vpc.main.id
-  subnet_ids            = data.aws_subnets.private.ids
+  vpc_id                = module.vpc.vpc_id
+  subnet_ids            = module.vpc.database_subnet_ids
   app_security_group_id = aws_security_group.lambda_app.id
   kms_key_arn           = aws_kms_key.main.arn
   master_password       = random_password.aurora_master.result
@@ -177,8 +158,8 @@ module "rds_proxy" {
 
   project_name          = local.project_name
   environment           = local.environment
-  vpc_id                = data.aws_vpc.main.id
-  subnet_ids            = data.aws_subnets.private.ids
+  vpc_id                = module.vpc.vpc_id
+  subnet_ids            = module.vpc.private_subnet_ids
   db_cluster_identifier = module.aurora.cluster_id
   db_secret_arn         = module.secrets.db_credentials_secret_arn
   app_security_group_id = aws_security_group.lambda_app.id
@@ -193,8 +174,8 @@ module "elasticache" {
 
   project_name = local.project_name
   environment  = local.environment
-  vpc_id       = data.aws_vpc.main.id
-  subnet_ids   = data.aws_subnets.private.ids
+  vpc_id       = module.vpc.vpc_id
+  subnet_ids   = module.vpc.private_subnet_ids
 
   allowed_security_group_ids = [aws_security_group.lambda_app.id]
 
@@ -220,67 +201,30 @@ module "waf" {
 # Data source for AWS account ID
 data "aws_caller_identity" "current" {}
 
-# Lambda Functions
-module "lambda" {
-  source = "../../modules/lambda"
+# ============================================================
+# NOTE: Lambda functions and API Gateway are managed by
+# Serverless Framework (see /lambda directory)
+#
+# Deploy with: cd lambda && npx serverless deploy --stage dev
+#
+# The following resources are managed by Terraform:
+# - VPC, Subnets, Security Groups
+# - Aurora PostgreSQL, RDS Proxy
+# - ElastiCache Redis
+# - Cognito User Pool
+# - Secrets Manager
+# - CloudFront Distribution
+# - WAF, KMS, S3 Audit Logs
+# ============================================================
 
-  project_name       = local.project_name
-  environment        = local.environment
-  aws_region         = var.aws_region
-  aws_account_id     = data.aws_caller_identity.current.account_id
-  vpc_id             = data.aws_vpc.main.id
-  private_subnet_ids = data.aws_subnets.private.ids
-  lambda_zip_path    = "../../../lambda-functions/dist/lambda.zip"
-
-  rds_proxy_endpoint        = module.rds_proxy.proxy_endpoint
-  redis_endpoint            = module.elasticache.primary_endpoint_address
-  db_name                   = module.aurora.cluster_database_name
-  db_credentials_secret_arn = module.secrets.db_credentials_secret_arn
-  cognito_user_pool_arn     = module.cognito.user_pool_arn
-
-  stripe_api_key_arn        = module.secrets.stripe_api_key_secret_arn
-  stripe_webhook_secret_arn = module.secrets.stripe_webhook_secret_arn
-  kms_key_arn               = aws_kms_key.main.arn
-
-  tags = local.common_tags
+# Data source for Serverless Framework deployed API Gateway
+data "aws_api_gateway_rest_api" "serverless" {
+  name = "dev-auth-billing"  # Serverless creates: {stage}-{service}
 }
 
-# API Gateway
-module "api_gateway" {
-  source = "../../modules/api-gateway"
-
-  project_name          = local.project_name
-  environment           = "development"
-  cognito_user_pool_arn = module.cognito.user_pool_arn
-  waf_web_acl_arn       = module.waf.web_acl_arn
-  enable_waf            = true
-
-  lambda_function_arns = {
-    auth             = module.lambda.auth_pre_signup_arn  # TODO: Replace with dedicated auth Lambda
-    me_entitlements  = module.lambda.entitlement_check_arn
-    me_usage         = module.lambda.usage_recorder_arn
-    checkout         = module.lambda.checkout_handler_arn
-    subscriptions    = module.lambda.checkout_handler_arn  # TODO: Replace with dedicated subscriptions Lambda
-    catalog          = module.lambda.entitlement_check_arn  # TODO: Replace with dedicated catalog Lambda
-    stripe_webhook   = module.lambda.webhook_processor_arn
-    admin            = module.lambda.admin_api_arn
-  }
-
-  lambda_function_names = {
-    auth             = module.lambda.auth_pre_signup_name  # TODO: Replace with dedicated auth Lambda
-    me_entitlements  = module.lambda.entitlement_check_name
-    me_usage         = module.lambda.usage_recorder_name
-    checkout         = module.lambda.checkout_handler_name
-    subscriptions    = module.lambda.checkout_handler_name  # TODO: Replace with dedicated subscriptions Lambda
-    catalog          = module.lambda.entitlement_check_name  # TODO: Replace with dedicated catalog Lambda
-    stripe_webhook   = module.lambda.webhook_processor_name
-    admin            = module.lambda.admin_api_name
-  }
-
-  default_throttle_burst_limit = var.apigw_throttle_burst_limit
-  default_throttle_rate_limit  = var.apigw_throttle_rate_limit
-
-  tags = local.common_tags
+data "aws_api_gateway_stage" "serverless" {
+  rest_api_id = data.aws_api_gateway_rest_api.serverless.id
+  stage_name  = "dev"
 }
 
 # CloudFront Distribution with Lambda@Edge
@@ -297,10 +241,10 @@ module "cloudfront" {
 
   origins = [
     {
-      # Extract only the domain name (remove https:// and /stage path)
-      domain_name = split("/", replace(module.api_gateway.api_endpoint, "https://", ""))[0]
+      # Reference Serverless Framework deployed API Gateway
+      domain_name = "${data.aws_api_gateway_rest_api.serverless.id}.execute-api.${var.aws_region}.amazonaws.com"
       origin_id   = "api-gateway"
-      origin_path = "/${module.api_gateway.stage_name}"
+      origin_path = "/${data.aws_api_gateway_stage.serverless.stage_name}"
       custom_origin_config = {
         http_port              = 80
         https_port             = 443

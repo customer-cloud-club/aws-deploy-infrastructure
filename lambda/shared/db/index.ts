@@ -129,6 +129,41 @@ async function getCredentials(forceRefresh = false): Promise<DatabaseConfig> {
 }
 
 /**
+ * Runs necessary database migrations
+ * Ensures required columns exist in all tables
+ */
+async function runMigrations() {
+  console.log('[DB] Running migrations...');
+
+  // PostgreSQL 9.6+ supports ADD COLUMN IF NOT EXISTS
+  const migrations = [
+    // Add deleted_at column to products
+    'ALTER TABLE products ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP',
+    'CREATE INDEX IF NOT EXISTS idx_products_deleted_at ON products(deleted_at)',
+    // Add deleted_at column to plans
+    'ALTER TABLE plans ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP',
+    'CREATE INDEX IF NOT EXISTS idx_plans_deleted_at ON plans(deleted_at)',
+    // Add deleted_at column to tenants
+    'ALTER TABLE tenants ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP',
+    'CREATE INDEX IF NOT EXISTS idx_tenants_deleted_at ON tenants(deleted_at)',
+    // Add deleted_at column to subscriptions
+    'ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP',
+    'CREATE INDEX IF NOT EXISTS idx_subscriptions_deleted_at ON subscriptions(deleted_at)',
+  ];
+
+  for (const migration of migrations) {
+    try {
+      await executeQuery(migration);
+      console.log('[DB] Migration executed:', migration.substring(0, 50) + '...');
+    } catch (error) {
+      console.warn('[DB] Migration warning:', migration.substring(0, 30), error);
+    }
+  }
+
+  console.log('[DB] Migrations completed');
+}
+
+/**
  * Initializes database connection pool
  * Should be called once during Lambda cold start
  *
@@ -155,6 +190,10 @@ export async function initializeDatabase() {
     }
 
     console.log('[DB] Successfully connected to Aurora PostgreSQL');
+
+    // Run migrations to ensure schema is up to date
+    await runMigrations();
+
     return pool;
   } catch (error) {
     console.error('[DB] Failed to initialize database:', error);

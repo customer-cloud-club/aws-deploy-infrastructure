@@ -51,10 +51,11 @@ resource "aws_subnet" "public" {
   tags = {
     Name = "${local.name_prefix}-public-${count.index + 1}"
     Type = "public"
+    Tier = "public"
   }
 }
 
-# Private Subnets (ECS用)
+# Private Subnets (Lambda/ECS用)
 resource "aws_subnet" "private" {
   count             = 2
   vpc_id            = aws_vpc.main.id
@@ -64,6 +65,7 @@ resource "aws_subnet" "private" {
   tags = {
     Name = "${local.name_prefix}-private-${count.index + 1}"
     Type = "private"
+    Tier = "private"
   }
 }
 
@@ -77,6 +79,7 @@ resource "aws_subnet" "database" {
   tags = {
     Name = "${local.name_prefix}-database-${count.index + 1}"
     Type = "database"
+    Tier = "database"
   }
 }
 
@@ -165,4 +168,12 @@ output "private_subnet_ids" {
 
 output "database_subnet_ids" {
   value = aws_subnet.database[*].id
+}
+
+output "nat_gateway_id" {
+  value = aws_nat_gateway.main.id
+}
+
+output "vpc_cidr_block" {
+  value = aws_vpc.main.cidr_block
 }
