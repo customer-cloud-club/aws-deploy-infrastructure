@@ -9,13 +9,36 @@
  */
 
 import { APIGatewayProxyHandler, APIGatewayProxyResult } from 'aws-lambda';
-import { initializeDatabase } from '../../../shared/db/index.js';
+import { initializeDatabase, query } from '../../../shared/db/index.js';
 import EntitlementCache from '../cache.js';
 import {
   EntitlementResponse,
   EntitlementWithPlan,
   DEFAULT_SOFT_LIMIT_PERCENT,
 } from '../types.js';
+
+/**
+ * Record user login for a product (upsert to user_product_logins)
+ * This runs asynchronously and doesn't block the main response
+ */
+async function recordUserProductLogin(userId: string, productId: string, email?: string): Promise<void> {
+  try {
+    await query(
+      `INSERT INTO user_product_logins (user_id, product_id, email, first_login_at, last_login_at, login_count)
+       VALUES ($1, $2, $3, NOW(), NOW(), 1)
+       ON CONFLICT (user_id, product_id) DO UPDATE SET
+         last_login_at = NOW(),
+         login_count = user_product_logins.login_count + 1,
+         email = COALESCE(EXCLUDED.email, user_product_logins.email),
+         updated_at = NOW()`,
+      [userId, productId, email || null]
+    );
+    console.log('Recorded user product login', { userId, productId });
+  } catch (error) {
+    // Log but don't fail the request - this is non-critical
+    console.error('Failed to record user product login', { error, userId, productId });
+  }
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -39,8 +62,10 @@ export const handler: APIGatewayProxyHandler = async (event): Promise<APIGateway
       };
     }
 
-    // Extract user ID from Cognito authorizer
-    const userId = event.requestContext?.authorizer?.['claims']?.['sub'];
+    // Extract user ID and email from Cognito authorizer
+    const claims = event.requestContext?.authorizer?.['claims'];
+    const userId = claims?.['sub'];
+    const email = claims?.['email'];
     if (!userId) {
       return {
         statusCode: 401,
@@ -66,6 +91,11 @@ export const handler: APIGatewayProxyHandler = async (event): Promise<APIGateway
     }
 
     console.log(`Checking entitlement for user: ${userId}, product: ${productId}`);
+
+    // Record user login for this product (fire-and-forget, non-blocking)
+    recordUserProductLogin(userId, productId, email).catch(() => {
+      // Already logged in the function, no need to handle here
+    });
 
     // Check cache first
     const cachedEntitlement = await EntitlementCache.getEntitlement(userId, productId);

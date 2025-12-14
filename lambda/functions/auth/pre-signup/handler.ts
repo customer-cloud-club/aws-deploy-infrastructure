@@ -7,6 +7,7 @@
  * Responsibilities:
  * - Validate email domain (block disposable email addresses)
  * - Auto-confirm users from external providers (social login)
+ * - Auto-confirm users who already exist in another product (cross-app auth)
  * - Custom validation logic before user creation
  *
  * @see https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-lambda-pre-sign-up.html
@@ -18,6 +19,7 @@ import {
   AuthError,
   AuthErrorCode,
 } from '../types.js';
+import { query } from '../../../shared/db/index.js';
 
 /**
  * Environment variables
@@ -65,6 +67,25 @@ function extractDomain(email: string): string {
     );
   }
   return parts[1];
+}
+
+/**
+ * Check if user email exists in user_product_logins table
+ * This indicates the user has already verified their email in another product
+ * @param email - Email address to check
+ * @returns true if user exists in another product
+ */
+async function checkExistingUserInOtherProducts(email: string): Promise<boolean> {
+  try {
+    const result = await query<{ count: string }>(
+      `SELECT COUNT(*) as count FROM user_product_logins WHERE email = $1`,
+      [email.toLowerCase()]
+    );
+    return parseInt(result.rows[0]?.count || '0', 10) > 0;
+  } catch (error) {
+    console.error('Failed to check existing user', { error, email });
+    return false;
+  }
 }
 
 /**
@@ -138,6 +159,18 @@ export const handler: PreSignUpTriggerHandler = async (event) => {
     if (triggerSource === 'PreSignUp_AdminCreateUser') {
       event.response.autoVerifyEmail = true;
       console.log('Auto-verifying admin-created user', { email });
+    }
+
+    // Auto-confirm users who already exist in another product (cross-app auth)
+    // This allows users to skip email verification when signing up for a new app
+    // if they've already verified their email in another app
+    if (triggerSource === 'PreSignUp_SignUp' && email) {
+      const existsInOtherProduct = await checkExistingUserInOtherProducts(email);
+      if (existsInOtherProduct) {
+        event.response.autoConfirmUser = true;
+        event.response.autoVerifyEmail = true;
+        console.log('Auto-confirming user from cross-app auth', { email });
+      }
     }
 
     return event;

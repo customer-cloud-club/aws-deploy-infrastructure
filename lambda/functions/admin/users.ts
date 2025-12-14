@@ -23,6 +23,7 @@ import {
   AdminListGroupsForUserCommand,
   AttributeType,
 } from '@aws-sdk/client-cognito-identity-provider';
+import { query } from '../../shared/db/index.js';
 
 const corsHeaders = {
   'Content-Type': 'application/json',
@@ -57,6 +58,14 @@ interface UpdateUserRequest {
   name?: string;
   role?: 'admin' | 'user';
   status?: 'active' | 'inactive';
+}
+
+interface UserProductLogin {
+  product_id: string;
+  product_name: string;
+  first_login_at: string;
+  last_login_at: string;
+  login_count: number;
 }
 
 /**
@@ -365,6 +374,59 @@ export async function deleteUser(userId: string): Promise<APIGatewayProxyResult>
       statusCode: 500,
       headers: corsHeaders,
       body: JSON.stringify({ error: 'Failed to delete user' }),
+    };
+  }
+}
+
+/**
+ * Get user's product login history
+ * GET /admin/users/{id}/logins
+ */
+export async function getUserLogins(userId: string): Promise<APIGatewayProxyResult> {
+  try {
+    const result = await query<{
+      product_id: string;
+      product_name: string;
+      first_login_at: Date;
+      last_login_at: Date;
+      login_count: number;
+    }>(
+      `SELECT
+        upl.product_id,
+        p.name as product_name,
+        upl.first_login_at,
+        upl.last_login_at,
+        upl.login_count
+       FROM user_product_logins upl
+       JOIN products p ON upl.product_id = p.id
+       WHERE upl.user_id = $1
+       ORDER BY upl.last_login_at DESC`,
+      [userId]
+    );
+
+    const logins: UserProductLogin[] = result.rows.map(row => ({
+      product_id: row.product_id,
+      product_name: row.product_name || 'Unknown',
+      first_login_at: row.first_login_at?.toISOString() || '',
+      last_login_at: row.last_login_at?.toISOString() || '',
+      login_count: row.login_count || 0,
+    }));
+
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: JSON.stringify({
+        user_id: userId,
+        logins,
+        total: logins.length,
+      }),
+    };
+  } catch (error) {
+    console.error('[Users] Error getting user logins:', error);
+    return {
+      statusCode: 500,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Failed to get user logins' }),
     };
   }
 }

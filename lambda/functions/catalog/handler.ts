@@ -27,6 +27,7 @@
  * User Management Endpoints (admin auth required):
  * - GET    /admin/users             - List users (Cognito)
  * - GET    /admin/users/{id}        - Get user
+ * - GET    /admin/users/{id}/logins - Get user's product login history
  * - POST   /admin/users             - Create user
  * - PUT    /admin/users/{id}        - Update user
  * - DELETE /admin/users/{id}        - Disable user
@@ -38,7 +39,7 @@ import { getProduct, listProducts, createProduct, updateProduct, deleteProduct }
 import { getPlan, listPlans, createPlan, updatePlan, deletePlan } from './plans.js';
 import { getTenant, listTenants, createTenant } from './tenants.js';
 import { getDashboardStats, getRevenueData, getUserGrowthData, getRecentActivity } from '../admin/dashboard.js';
-import { listUsers, getUser, createUser, updateUser, deleteUser } from '../admin/users.js';
+import { listUsers, getUser, createUser, updateUser, deleteUser, getUserLogins } from '../admin/users.js';
 import { AdminCheckResult } from './types.js';
 
 /**
@@ -211,7 +212,7 @@ export const handler: APIGatewayProxyHandler = async (event): Promise<APIGateway
         break;
 
       case 'users':
-        result = await handleUsersRoute(method, resourceId, event.body, event.queryStringParameters);
+        result = await handleUsersRoute(method, resourceId, event.body, event.queryStringParameters, path);
         break;
 
       default:
@@ -486,10 +487,19 @@ async function handleUsersRoute(
   method: string,
   resourceId: string | null,
   body: string | null,
-  queryParams: APIGatewayProxyEventQueryStringParameters | null
+  queryParams: APIGatewayProxyEventQueryStringParameters | null,
+  path: string
 ): Promise<APIGatewayProxyResult> {
+  // Check for sub-routes like /admin/users/{id}/logins
+  const pathParts = path.split('/').filter(Boolean);
+  const subRoute = pathParts.length >= 4 ? pathParts[3] : null;
+
   switch (method) {
     case 'GET':
+      if (resourceId && subRoute === 'logins') {
+        // GET /admin/users/{id}/logins
+        return getUserLogins(resourceId);
+      }
       if (resourceId) {
         // GET /admin/users/{id}
         return getUser(resourceId);
