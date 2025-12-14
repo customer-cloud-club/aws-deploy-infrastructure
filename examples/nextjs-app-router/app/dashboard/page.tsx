@@ -158,6 +158,7 @@ export default function DashboardPage() {
           </div>
         </div>
       ) : entitlement ? (
+        <>
         <div className="bg-white shadow rounded-lg p-6 mb-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-gray-900">現在のプラン</h2>
@@ -295,6 +296,7 @@ export default function DashboardPage() {
             </div>
           </div>
         )}
+        </>
       ) : (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6">
           <h2 className="text-lg font-semibold text-yellow-800 mb-2">プラン未登録</h2>
