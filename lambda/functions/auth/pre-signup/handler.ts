@@ -70,20 +70,19 @@ function extractDomain(email: string): string {
 }
 
 /**
- * Check if user email exists in user_product_logins table
- * This indicates the user has already verified their email in another product
+ * Check if user email has been verified before (in any app)
  * @param email - Email address to check
- * @returns true if user exists in another product
+ * @returns true if email was previously verified
  */
-async function checkExistingUserInOtherProducts(email: string): Promise<boolean> {
+async function checkEmailVerified(email: string): Promise<boolean> {
   try {
-    const result = await query<{ count: string }>(
-      `SELECT COUNT(*) as count FROM user_product_logins WHERE email = $1`,
+    const result = await query<{ email: string }>(
+      `SELECT email FROM verified_emails WHERE email = $1 LIMIT 1`,
       [email.toLowerCase()]
     );
-    return parseInt(result.rows[0]?.count || '0', 10) > 0;
+    return result.rows.length > 0;
   } catch (error) {
-    console.error('Failed to check existing user', { error, email });
+    console.error('Failed to check verified email', { error, email });
     return false;
   }
 }
@@ -161,15 +160,15 @@ export const handler: PreSignUpTriggerHandler = async (event) => {
       console.log('Auto-verifying admin-created user', { email });
     }
 
-    // Auto-confirm users who already exist in another product (cross-app auth)
+    // Auto-confirm users whose email was already verified (cross-app auth)
     // This allows users to skip email verification when signing up for a new app
     // if they've already verified their email in another app
     if (triggerSource === 'PreSignUp_SignUp' && email) {
-      const existsInOtherProduct = await checkExistingUserInOtherProducts(email);
-      if (existsInOtherProduct) {
+      const isVerified = await checkEmailVerified(email);
+      if (isVerified) {
         event.response.autoConfirmUser = true;
         event.response.autoVerifyEmail = true;
-        console.log('Auto-confirming user from cross-app auth', { email });
+        console.log('Auto-confirming user (email already verified)', { email });
       }
     }
 

@@ -18,6 +18,27 @@ import {
 } from '../types.js';
 
 /**
+ * Record verified email (for cross-app auth)
+ * This runs asynchronously and doesn't block the main response
+ */
+async function recordVerifiedEmail(userId: string, email?: string): Promise<void> {
+  if (!email) return;
+
+  try {
+    await query(
+      `INSERT INTO verified_emails (email, user_id, first_verified_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (email) DO NOTHING`,
+      [email.toLowerCase(), userId]
+    );
+    console.log('Recorded verified email', { email });
+  } catch (error) {
+    // Log but don't fail the request - this is non-critical
+    console.error('Failed to record verified email', { error, email });
+  }
+}
+
+/**
  * Record user login for a product (upsert to user_product_logins)
  * This runs asynchronously and doesn't block the main response
  */
@@ -92,10 +113,9 @@ export const handler: APIGatewayProxyHandler = async (event): Promise<APIGateway
 
     console.log(`Checking entitlement for user: ${userId}, product: ${productId}`);
 
-    // Record user login for this product (fire-and-forget, non-blocking)
-    recordUserProductLogin(userId, productId, email).catch(() => {
-      // Already logged in the function, no need to handle here
-    });
+    // Record verified email and product login (fire-and-forget, non-blocking)
+    recordVerifiedEmail(userId, email).catch(() => {});
+    recordUserProductLogin(userId, productId, email).catch(() => {});
 
     // Check cache first
     const cachedEntitlement = await EntitlementCache.getEntitlement(userId, productId);
