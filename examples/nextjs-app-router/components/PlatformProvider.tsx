@@ -1,100 +1,175 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
 import {
-  initializePlatformSDK,
-  PlatformSDK,
   AuthUser,
-  Entitlement,
+  AuthTokens,
+  getStoredTokens,
+  saveTokens,
+  clearTokens,
   getLoginUrl,
   getLogoutUrl,
-} from '@/lib/platform';
+  getValidAccessToken,
+} from '@/lib/auth';
+import { Entitlement, getEntitlement } from '@/lib/api';
 
 interface PlatformContextType {
+  // Auth state
   user: AuthUser | null;
+  accessToken: string | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+
+  // Entitlement state
   entitlement: Entitlement | null;
-  loading: boolean;
-  error: string | null;
+  entitlementLoading: boolean;
+
+  // Actions
   login: (redirectTo?: string) => void;
   logout: () => void;
   refreshEntitlement: () => Promise<void>;
+  getAccessToken: () => Promise<string | null>;
+
+  // Token management (for auth callback)
+  handleAuthCallback: (tokens: AuthTokens) => void;
 }
 
 const PlatformContext = createContext<PlatformContextType | null>(null);
 
+const PRODUCT_ID = process.env.NEXT_PUBLIC_PRODUCT_ID || '';
+
 export function PlatformProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
+  const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
+  const [entitlementLoading, setEntitlementLoading] = useState(false);
+
+  // Initialize auth state from storage
   useEffect(() => {
-    initializePlatformSDK();
-    checkAuth();
+    async function initAuth() {
+      try {
+        const { tokens, user: storedUser } = getStoredTokens();
+
+        if (tokens && storedUser) {
+          // Try to get valid access token (will refresh if needed)
+          const validToken = await getValidAccessToken();
+
+          if (validToken) {
+            setUser(storedUser);
+            setAccessToken(validToken);
+          }
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+        clearTokens();
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    initAuth();
   }, []);
 
-  async function checkAuth() {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const authState = PlatformSDK.getAuthState();
-      if (authState) {
-        setUser(authState);
-
-        // Fetch entitlement
-        try {
-          const ent = await PlatformSDK.getEntitlement();
-          setEntitlement(ent);
-        } catch (entError) {
-          console.error('Failed to fetch entitlement:', entError);
-          // User is authenticated but has no entitlement
-        }
+  // Fetch entitlement when authenticated
+  useEffect(() => {
+    async function fetchEntitlement() {
+      if (!accessToken || !PRODUCT_ID) {
+        setEntitlement(null);
+        return;
       }
-    } catch (err) {
-      console.error('Auth check failed:', err);
-      setError('Failed to check authentication');
-    } finally {
-      setLoading(false);
-    }
-  }
 
-  function login(redirectTo?: string) {
-    const loginUrl = getLoginUrl(redirectTo);
+      setEntitlementLoading(true);
+      try {
+        const ent = await getEntitlement(PRODUCT_ID, accessToken);
+        setEntitlement(ent);
+      } catch (error) {
+        console.error('Failed to fetch entitlement:', error);
+        setEntitlement(null);
+      } finally {
+        setEntitlementLoading(false);
+      }
+    }
+
+    fetchEntitlement();
+  }, [accessToken]);
+
+  // Login - redirect to Cognito Hosted UI
+  const login = useCallback((redirectTo?: string) => {
+    if (typeof window === 'undefined') return;
+
+    const callbackUrl = `${window.location.origin}/auth/callback`;
+    const state = redirectTo || window.location.pathname;
+    const loginUrl = getLoginUrl(callbackUrl, state);
+
     window.location.href = loginUrl;
-  }
+  }, []);
 
-  function logout() {
-    PlatformSDK.logout();
+  // Logout - clear tokens and redirect to Cognito logout
+  const logout = useCallback(() => {
+    if (typeof window === 'undefined') return;
+
+    clearTokens();
     setUser(null);
+    setAccessToken(null);
     setEntitlement(null);
-    window.location.href = getLogoutUrl();
-  }
 
-  async function refreshEntitlement() {
-    if (!user) return;
+    const logoutUrl = getLogoutUrl(window.location.origin);
+    window.location.href = logoutUrl;
+  }, []);
 
-    try {
-      PlatformSDK.clearCache();
-      const ent = await PlatformSDK.getEntitlement(true);
-      setEntitlement(ent);
-    } catch (err) {
-      console.error('Failed to refresh entitlement:', err);
+  // Handle auth callback - save tokens from OAuth callback
+  const handleAuthCallback = useCallback((tokens: AuthTokens) => {
+    saveTokens(tokens);
+    const { user: newUser } = getStoredTokens();
+    setUser(newUser);
+    setAccessToken(tokens.accessToken);
+  }, []);
+
+  // Get valid access token
+  const getAccessToken = useCallback(async (): Promise<string | null> => {
+    const token = await getValidAccessToken();
+    if (token !== accessToken) {
+      setAccessToken(token);
     }
-  }
+    return token;
+  }, [accessToken]);
+
+  // Refresh entitlement
+  const refreshEntitlement = useCallback(async () => {
+    if (!accessToken || !PRODUCT_ID) return;
+
+    setEntitlementLoading(true);
+    try {
+      const token = await getValidAccessToken();
+      if (token) {
+        const ent = await getEntitlement(PRODUCT_ID, token);
+        setEntitlement(ent);
+      }
+    } catch (error) {
+      console.error('Failed to refresh entitlement:', error);
+    } finally {
+      setEntitlementLoading(false);
+    }
+  }, [accessToken]);
+
+  const value: PlatformContextType = {
+    user,
+    accessToken,
+    isAuthenticated: !!user && !!accessToken,
+    isLoading,
+    entitlement,
+    entitlementLoading,
+    login,
+    logout,
+    refreshEntitlement,
+    getAccessToken,
+    handleAuthCallback,
+  };
 
   return (
-    <PlatformContext.Provider
-      value={{
-        user,
-        entitlement,
-        loading,
-        error,
-        login,
-        logout,
-        refreshEntitlement,
-      }}
-    >
+    <PlatformContext.Provider value={value}>
       {children}
     </PlatformContext.Provider>
   );

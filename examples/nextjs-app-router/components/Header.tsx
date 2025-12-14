@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePlatform } from './PlatformProvider';
 
 export function Header() {
-  const { user, entitlement, loading, login, logout } = usePlatform();
+  const { user, entitlement, isLoading, login, logout, isAuthenticated } = usePlatform();
 
   return (
     <header className="bg-white shadow">
@@ -20,38 +20,40 @@ export function Header() {
           {/* Navigation */}
           <nav className="flex items-center space-x-4">
             <Link href="/plans" className="text-gray-600 hover:text-gray-900">
-              Plans
+              プラン
             </Link>
 
-            {user ? (
+            {isAuthenticated ? (
               <>
                 <Link href="/dashboard" className="text-gray-600 hover:text-gray-900">
-                  Dashboard
+                  ダッシュボード
                 </Link>
 
                 {/* User Info */}
                 <div className="flex items-center space-x-3">
-                  <span className="text-sm text-gray-500">
-                    {entitlement?.planName || 'Free'}
-                  </span>
+                  {entitlement && (
+                    <span className="text-sm px-2 py-1 bg-blue-100 text-blue-800 rounded">
+                      {entitlement.plan_id}
+                    </span>
+                  )}
                   <span className="text-sm text-gray-700">
-                    {user.email}
+                    {user?.email}
                   </span>
                   <button
                     onClick={logout}
                     className="text-sm text-red-600 hover:text-red-800"
                   >
-                    Logout
+                    ログアウト
                   </button>
                 </div>
               </>
             ) : (
               <button
                 onClick={() => login()}
-                disabled={loading}
+                disabled={isLoading}
                 className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
               >
-                {loading ? 'Loading...' : 'Login'}
+                {isLoading ? '読み込み中...' : 'ログイン'}
               </button>
             )}
           </nav>

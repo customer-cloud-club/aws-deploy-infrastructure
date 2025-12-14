@@ -111,8 +111,26 @@ module "cognito" {
   project_name = local.project_name
   environment  = local.environment
 
-  callback_urls = ["http://localhost:3000/callback"]
-  logout_urls   = ["http://localhost:3000/logout"]
+  # Cognito Hosted UI domain (required for OAuth login)
+  user_pool_domain = "auth-billing-dev"
+
+  # Callback URLs for various apps
+  callback_urls = [
+    "http://localhost:3000/callback",           # Admin portal
+    "http://localhost:3000/api/auth/callback",  # Admin portal API route
+    "http://localhost:3001/callback",           # Sample app
+    "http://localhost:3001/api/auth/callback",  # Sample app API route
+    "http://localhost:3001/auth/callback",      # Sample app client callback
+    "https://d1l1triqc0qles.cloudfront.net/callback"  # CloudFront
+  ]
+
+  logout_urls = [
+    "http://localhost:3000",                    # Admin portal
+    "http://localhost:3000/logout",             # Admin portal logout
+    "http://localhost:3001",                    # Sample app
+    "http://localhost:3001/logout",             # Sample app logout
+    "https://d1l1triqc0qles.cloudfront.net"     # CloudFront
+  ]
 
   # Dev environment settings
   deletion_protection = "INACTIVE"
@@ -222,9 +240,9 @@ data "aws_api_gateway_rest_api" "serverless" {
   name = "dev-auth-billing"  # Serverless creates: {stage}-{service}
 }
 
-data "aws_api_gateway_stage" "serverless" {
-  rest_api_id = data.aws_api_gateway_rest_api.serverless.id
-  stage_name  = "dev"
+# Stage name is fixed by Serverless Framework
+locals {
+  api_gateway_stage_name = "dev"
 }
 
 # CloudFront Distribution with Lambda@Edge
@@ -244,7 +262,7 @@ module "cloudfront" {
       # Reference Serverless Framework deployed API Gateway
       domain_name = "${data.aws_api_gateway_rest_api.serverless.id}.execute-api.${var.aws_region}.amazonaws.com"
       origin_id   = "api-gateway"
-      origin_path = "/${data.aws_api_gateway_stage.serverless.stage_name}"
+      origin_path = "/${local.api_gateway_stage_name}"
       custom_origin_config = {
         http_port              = 80
         https_port             = 443

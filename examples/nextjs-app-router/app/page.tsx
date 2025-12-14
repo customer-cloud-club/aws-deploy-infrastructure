@@ -11,11 +11,11 @@ export default function HomePage() {
       {/* Hero Section */}
       <div className="text-center py-16">
         <h1 className="text-4xl font-bold text-gray-900 mb-4">
-          Platform SDK Demo
+          認証・課金プラットフォーム デモ
         </h1>
         <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-          This example demonstrates how to integrate the Platform SDK with Next.js App Router
-          for authentication, entitlement checking, and usage tracking.
+          Next.js App Router と Cognito 認証、Stripe 課金、
+          エンタイトルメント管理の統合デモアプリケーションです。
         </p>
 
         {user ? (
@@ -24,13 +24,13 @@ export default function HomePage() {
               href="/dashboard"
               className="inline-block bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700"
             >
-              Go to Dashboard
+              ダッシュボードへ
             </Link>
             <Link
               href="/plans"
               className="inline-block bg-white text-blue-600 border border-blue-600 px-6 py-3 rounded-md hover:bg-blue-50"
             >
-              View Plans
+              プランを見る
             </Link>
           </div>
         ) : (
@@ -39,13 +39,13 @@ export default function HomePage() {
               onClick={() => login()}
               className="inline-block bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700"
             >
-              Get Started
+              はじめる
             </button>
             <Link
               href="/plans"
               className="inline-block bg-white text-blue-600 border border-blue-600 px-6 py-3 rounded-md hover:bg-blue-50"
             >
-              View Plans
+              プランを見る
             </Link>
           </div>
         )}
@@ -54,31 +54,31 @@ export default function HomePage() {
       {/* Features Section */}
       <div className="py-12">
         <h2 className="text-2xl font-bold text-center text-gray-900 mb-8">
-          Features Demonstrated
+          主な機能
         </h2>
         <div className="grid md:grid-cols-3 gap-6">
           <div className="bg-white p-6 rounded-lg shadow">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Authentication
+              認証
             </h3>
             <p className="text-gray-600">
-              Cognito-based authentication with automatic token management and refresh.
+              Cognito Hosted UI によるOAuth認証。自動トークン管理とリフレッシュ。
             </p>
           </div>
           <div className="bg-white p-6 rounded-lg shadow">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Entitlements
+              エンタイトルメント
             </h3>
             <p className="text-gray-600">
-              Feature flags and usage limits based on user's subscription plan.
+              サブスクリプションプランに基づく機能フラグと使用量制限。
             </p>
           </div>
           <div className="bg-white p-6 rounded-lg shadow">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Usage Tracking
+              使用量トラッキング
             </h3>
             <p className="text-gray-600">
-              Real-time usage recording and limit checking for metered features.
+              従量課金機能のリアルタイム使用量記録とリミットチェック。
             </p>
           </div>
         </div>
@@ -87,31 +87,35 @@ export default function HomePage() {
       {/* Code Example */}
       <div className="py-12">
         <h2 className="text-2xl font-bold text-center text-gray-900 mb-8">
-          Quick Code Example
+          クイックコード例
         </h2>
         <div className="bg-gray-900 text-gray-100 p-6 rounded-lg overflow-x-auto">
           <pre className="text-sm">
-{`import { PlatformSDK } from '@customer-cloud-club/platform-sdk';
+{`// PlatformProvider でラップして認証状態を管理
+import { usePlatform } from '@/components/PlatformProvider';
+import { FeatureGate, UsageLimitGate } from '@/components/FeatureGate';
+import { recordUsage, getEntitlement } from '@/lib/api';
 
-// Initialize SDK
-PlatformSDK.init({
-  productId: process.env.NEXT_PUBLIC_PLATFORM_PRODUCT_ID!,
-  apiUrl: process.env.NEXT_PUBLIC_PLATFORM_API_URL!,
-});
+function MyComponent() {
+  const { user, isAuthenticated, entitlement, getAccessToken } = usePlatform();
 
-// Check authentication
-const user = await PlatformSDK.requireAuth();
+  // 認証チェック
+  if (!isAuthenticated) {
+    return <LoginButton />;
+  }
 
-// Check feature flag
-if (await PlatformSDK.hasFeature('premium_feature')) {
-  // Show premium content
+  // 機能ゲート - プレミアム機能のアクセス制御
+  return (
+    <FeatureGate feature="premium_feature" fallback={<UpgradePrompt />}>
+      <PremiumContent />
+    </FeatureGate>
+  );
 }
 
-// Check usage limit
-const { allowed, remaining } = await PlatformSDK.checkLimit('apiCalls');
-if (allowed) {
-  // Record usage
-  await PlatformSDK.incrementUsage('apiCalls');
+// 使用量を記録
+async function trackApiCall() {
+  const token = await getAccessToken();
+  await recordUsage(PRODUCT_ID, { type: 'api_call', amount: 1 }, token);
 }`}
           </pre>
         </div>

@@ -20,6 +20,11 @@ output "cognito_user_pool_domain" {
   value       = module.cognito.user_pool_domain
 }
 
+output "cognito_hosted_ui_url" {
+  description = "Cognito Hosted UI URL"
+  value       = "https://${module.cognito.user_pool_domain}.auth.ap-northeast-1.amazoncognito.com"
+}
+
 # Aurora Outputs
 output "aurora_cluster_endpoint" {
   description = "Aurora cluster writer endpoint"
@@ -93,7 +98,7 @@ output "api_gateway_id" {
 
 output "api_gateway_invoke_url" {
   description = "API Gateway invoke URL (Serverless managed)"
-  value       = "https://${data.aws_api_gateway_rest_api.serverless.id}.execute-api.ap-northeast-1.amazonaws.com/${data.aws_api_gateway_stage.serverless.stage_name}"
+  value       = "https://${data.aws_api_gateway_rest_api.serverless.id}.execute-api.ap-northeast-1.amazonaws.com/dev"
 }
 
 # CloudFront Outputs
