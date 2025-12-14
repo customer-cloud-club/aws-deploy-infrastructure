@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { usePlatform } from '@/components/PlatformProvider';
-import { Plan, getPlans, createCheckoutSession } from '@/lib/api';
+import { Plan, getPlans, createCheckoutSession, updateSubscription } from '@/lib/api';
 
 const PRODUCT_ID = process.env.NEXT_PUBLIC_PRODUCT_ID || '';
 
@@ -21,11 +22,13 @@ function formatPrice(amount: number, currency: string, period: string): string {
 }
 
 export default function PlansPage() {
-  const { user, accessToken, entitlement, login, getAccessToken } = usePlatform();
+  const router = useRouter();
+  const { user, accessToken, entitlement, login, getAccessToken, refreshEntitlement } = usePlatform();
 
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [processingPlanId, setProcessingPlanId] = useState<string | null>(null);
 
   // Fetch plans on mount
@@ -53,7 +56,27 @@ export default function PlansPage() {
   }, []);
 
   /**
-   * Handle plan selection - create Stripe Checkout session
+   * Get the current plan's price amount
+   */
+  function getCurrentPlanPrice(): number {
+    if (!entitlement?.plan_id) return 0;
+    const currentPlan = plans.find(p => p.id === entitlement.plan_id);
+    return currentPlan?.price_amount ?? 0;
+  }
+
+  /**
+   * Determine if this is an upgrade, downgrade, or new subscription
+   */
+  function getPlanAction(plan: Plan): 'upgrade' | 'downgrade' | 'subscribe' {
+    if (!entitlement?.plan_id) return 'subscribe';
+    const currentPrice = getCurrentPlanPrice();
+    if (plan.price_amount > currentPrice) return 'upgrade';
+    if (plan.price_amount < currentPrice) return 'downgrade';
+    return 'subscribe';
+  }
+
+  /**
+   * Handle plan selection - create Stripe Checkout or update subscription
    */
   async function handleSelectPlan(plan: Plan) {
     // If not logged in, redirect to login
@@ -64,6 +87,7 @@ export default function PlansPage() {
 
     setProcessingPlanId(plan.id);
     setError(null);
+    setSuccessMessage(null);
 
     try {
       // Get fresh access token
@@ -73,22 +97,49 @@ export default function PlansPage() {
         return;
       }
 
-      // Create checkout session
-      const response = await createCheckoutSession(
-        {
-          plan_id: plan.stripe_price_id,
-          product_id: PRODUCT_ID,
-          success_url: `${window.location.origin}/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${window.location.origin}/plans?checkout=cancelled`,
-        },
-        token
-      );
+      const action = getPlanAction(plan);
 
-      // Redirect to Stripe Checkout
-      window.location.href = response.url;
+      if (action === 'subscribe') {
+        // New subscription - use Stripe Checkout
+        const response = await createCheckoutSession(
+          {
+            plan_id: plan.stripe_price_id,
+            product_id: PRODUCT_ID,
+            success_url: `${window.location.origin}/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${window.location.origin}/plans?checkout=cancelled`,
+          },
+          token
+        );
+        window.location.href = response.url;
+      } else {
+        // Upgrade or downgrade - use subscription update API
+        const prorationBehavior = action === 'upgrade' ? 'create_prorations' : 'none';
+
+        const response = await updateSubscription(
+          {
+            new_plan_id: plan.id,
+            proration_behavior: prorationBehavior,
+          },
+          token
+        );
+
+        // Refresh entitlement to reflect new plan
+        await refreshEntitlement();
+
+        setSuccessMessage(
+          action === 'upgrade'
+            ? `${response.new_plan.name}プランにアップグレードしました！差額は日割りで請求されます。`
+            : `${response.new_plan.name}プランにダウングレードしました。次回請求から新料金が適用されます。`
+        );
+
+        // Redirect to dashboard after a short delay
+        setTimeout(() => {
+          router.push('/dashboard?plan_updated=true');
+        }, 2000);
+      }
     } catch (err) {
-      console.error('Checkout error:', err);
-      setError(err instanceof Error ? err.message : 'チェックアウトの作成に失敗しました');
+      console.error('Plan change error:', err);
+      setError(err instanceof Error ? err.message : 'プラン変更に失敗しました');
     } finally {
       setProcessingPlanId(null);
     }
@@ -114,6 +165,13 @@ export default function PlansPage() {
           いつでもアップグレード・ダウングレードが可能です。
         </p>
       </div>
+
+      {/* Success message */}
+      {successMessage && (
+        <div className="max-w-md mx-auto mb-8 bg-green-50 border border-green-200 rounded-lg p-4">
+          <p className="text-green-800 text-sm">{successMessage}</p>
+        </div>
+      )}
 
       {/* Error message */}
       {error && (
@@ -224,7 +282,13 @@ export default function PlansPage() {
                     <button
                       onClick={() => handleSelectPlan(plan)}
                       disabled={isProcessing}
-                      className="w-full bg-blue-600 text-white py-3 rounded-md hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      className={`w-full py-3 rounded-md transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                        getPlanAction(plan) === 'upgrade'
+                          ? 'bg-green-600 text-white hover:bg-green-700'
+                          : getPlanAction(plan) === 'downgrade'
+                          ? 'bg-orange-500 text-white hover:bg-orange-600'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
                     >
                       {isProcessing ? (
                         <span className="flex items-center justify-center">
@@ -249,10 +313,14 @@ export default function PlansPage() {
                           </svg>
                           処理中...
                         </span>
-                      ) : user ? (
-                        'このプランを選択'
-                      ) : (
+                      ) : !user ? (
                         'サインアップして選択'
+                      ) : getPlanAction(plan) === 'upgrade' ? (
+                        'アップグレード'
+                      ) : getPlanAction(plan) === 'downgrade' ? (
+                        'ダウングレード'
+                      ) : (
+                        'このプランを選択'
                       )}
                     </button>
                   )}

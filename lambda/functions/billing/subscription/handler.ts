@@ -358,8 +358,12 @@ async function resumeSubscription(event: Parameters<APIGatewayProxyHandler>[0]):
 }
 
 /**
- * Update Subscription Plan
+ * Update Subscription Plan (Upgrade/Downgrade)
  * POST /subscriptions/update
+ *
+ * Request body:
+ * - new_plan_id: UUID of the new plan
+ * - proration_behavior: 'create_prorations' (default for upgrade) | 'none' (for downgrade)
  */
 async function updatePlan(event: Parameters<APIGatewayProxyHandler>[0]): Promise<APIGatewayProxyResult> {
   const userId = getUserId(event);
@@ -379,7 +383,7 @@ async function updatePlan(event: Parameters<APIGatewayProxyHandler>[0]): Promise
     };
   }
 
-  const { new_plan_id } = JSON.parse(event.body);
+  const { new_plan_id, proration_behavior = 'create_prorations' } = JSON.parse(event.body);
   if (!new_plan_id) {
     return {
       statusCode: 400,
@@ -388,9 +392,26 @@ async function updatePlan(event: Parameters<APIGatewayProxyHandler>[0]): Promise
     };
   }
 
-  const result = await query<{ stripe_subscription_id: string }>(
+  // Get new plan's Stripe price ID
+  const planResult = await query<{ stripe_price_id: string; price_amount: number; name: string; product_id: string }>(
+    `SELECT stripe_price_id, price_amount, name, product_id FROM plans WHERE id = $1 AND is_active = true AND deleted_at IS NULL`,
+    [new_plan_id]
+  );
+
+  if (planResult.rows.length === 0) {
+    return {
+      statusCode: 404,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Plan not found' }),
+    };
+  }
+
+  const newPlan = planResult.rows[0]!;
+
+  // Get current subscription
+  const subResult = await query<{ id: string; stripe_subscription_id: string; plan_id: string }>(
     `
-    SELECT stripe_subscription_id
+    SELECT id, stripe_subscription_id, plan_id
     FROM subscriptions
     WHERE user_id = $1
       AND status IN ('active', 'trialing')
@@ -401,7 +422,7 @@ async function updatePlan(event: Parameters<APIGatewayProxyHandler>[0]): Promise
     [userId]
   );
 
-  if (result.rows.length === 0) {
+  if (subResult.rows.length === 0) {
     return {
       statusCode: 404,
       headers: corsHeaders,
@@ -409,7 +430,8 @@ async function updatePlan(event: Parameters<APIGatewayProxyHandler>[0]): Promise
     };
   }
 
-  const subscriptionId = result.rows[0]!.stripe_subscription_id;
+  const currentSub = subResult.rows[0]!;
+  const subscriptionId = currentSub.stripe_subscription_id;
 
   // Retrieve current subscription from Stripe
   const stripe = await getStripeClient();
@@ -426,11 +448,30 @@ async function updatePlan(event: Parameters<APIGatewayProxyHandler>[0]): Promise
 
   // Update subscription with new price
   const updatedSubscription = await stripe.subscriptions.update(subscriptionId, {
-    items: [{ id: currentItemId, price: new_plan_id }],
-    proration_behavior: 'create_prorations',
+    items: [{ id: currentItemId, price: newPlan.stripe_price_id }],
+    proration_behavior: proration_behavior as 'create_prorations' | 'none' | 'always_invoice',
   });
 
-  console.log('[SubscriptionHandler] Subscription plan updated', { userId, subscriptionId, new_plan_id });
+  // Update local subscriptions table
+  await query(
+    `UPDATE subscriptions SET plan_id = $1, updated_at = NOW() WHERE id = $2`,
+    [new_plan_id, currentSub.id]
+  );
+
+  // Update entitlements table
+  await query(
+    `UPDATE entitlements SET plan_id = $1, updated_at = NOW() WHERE user_id = $2 AND product_id = $3 AND status = 'active'`,
+    [new_plan_id, userId, newPlan.product_id]
+  );
+
+  console.log('[SubscriptionHandler] Subscription plan updated', {
+    userId,
+    subscriptionId,
+    old_plan_id: currentSub.plan_id,
+    new_plan_id,
+    new_plan_name: newPlan.name,
+    proration_behavior
+  });
 
   return {
     statusCode: 200,
@@ -438,6 +479,11 @@ async function updatePlan(event: Parameters<APIGatewayProxyHandler>[0]): Promise
     body: JSON.stringify({
       message: 'Subscription plan updated successfully',
       subscription_id: updatedSubscription.id,
+      new_plan: {
+        id: new_plan_id,
+        name: newPlan.name,
+        price_amount: newPlan.price_amount,
+      },
       effective_date: new Date().toISOString(),
     }),
   };

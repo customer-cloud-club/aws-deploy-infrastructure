@@ -156,6 +156,70 @@ export async function createCheckoutSession(
 }
 
 // ============================================
+// Subscription Management API (Auth Required)
+// ============================================
+
+export interface UpdateSubscriptionRequest {
+  new_plan_id: string;
+  proration_behavior?: 'create_prorations' | 'none';
+}
+
+export interface UpdateSubscriptionResponse {
+  message: string;
+  subscription_id: string;
+  new_plan: {
+    id: string;
+    name: string;
+    price_amount: number;
+  };
+  effective_date: string;
+}
+
+/**
+ * Update subscription plan (upgrade/downgrade)
+ */
+export async function updateSubscription(
+  request: UpdateSubscriptionRequest,
+  accessToken: string
+): Promise<UpdateSubscriptionResponse> {
+  return apiFetch<UpdateSubscriptionResponse>(
+    '/subscriptions/update',
+    {
+      method: 'POST',
+      body: JSON.stringify(request),
+    },
+    accessToken
+  );
+}
+
+/**
+ * Cancel subscription at period end
+ */
+export async function cancelSubscription(
+  accessToken: string
+): Promise<{ message: string; cancel_at: string }> {
+  return apiFetch<{ message: string; cancel_at: string }>(
+    '/subscriptions/cancel',
+    { method: 'POST' },
+    accessToken
+  );
+}
+
+/**
+ * Get Stripe Customer Portal URL
+ */
+export async function getCustomerPortalUrl(
+  returnUrl: string,
+  accessToken: string
+): Promise<{ url: string }> {
+  return apiFetch<{ url: string }>(
+    `/subscriptions/portal?return_url=${encodeURIComponent(returnUrl)}`,
+    {},
+    accessToken
+  );
+}
+
+// ============================================
 // Usage API (Auth Required)
 // ============================================
 

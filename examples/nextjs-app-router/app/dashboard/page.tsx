@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { usePlatform } from '@/components/PlatformProvider';
 import { FeatureGate, UsageLimitGate } from '@/components/FeatureGate';
-import { recordUsage } from '@/lib/api';
+import { recordUsage, cancelSubscription, getCustomerPortalUrl } from '@/lib/api';
 import Link from 'next/link';
 
 const PRODUCT_ID = process.env.NEXT_PUBLIC_PRODUCT_ID || '';
@@ -15,6 +15,8 @@ export default function DashboardPage() {
   const { user, isLoading, isAuthenticated, entitlement, entitlementLoading, refreshEntitlement, getAccessToken } = usePlatform();
   const [recording, setRecording] = useState(false);
   const [checkoutMessage, setCheckoutMessage] = useState<string | null>(null);
+  const [canceling, setCanceling] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   // Check for checkout result
   useEffect(() => {
@@ -57,6 +59,45 @@ export default function DashboardPage() {
       alert('使用量の記録に失敗しました');
     } finally {
       setRecording(false);
+    }
+  }
+
+  // Cancel subscription
+  async function handleCancelSubscription() {
+    setCanceling(true);
+    try {
+      const token = await getAccessToken();
+      if (!token) {
+        alert('認証が必要です');
+        return;
+      }
+
+      const response = await cancelSubscription(token);
+      setCheckoutMessage(`サブスクリプションは ${new Date(response.cancel_at).toLocaleDateString('ja-JP')} にキャンセルされます。`);
+      setShowCancelConfirm(false);
+      await refreshEntitlement();
+    } catch (error) {
+      console.error('Failed to cancel subscription:', error);
+      alert('キャンセルに失敗しました');
+    } finally {
+      setCanceling(false);
+    }
+  }
+
+  // Open Stripe Customer Portal
+  async function handleOpenPortal() {
+    try {
+      const token = await getAccessToken();
+      if (!token) {
+        alert('認証が必要です');
+        return;
+      }
+
+      const response = await getCustomerPortalUrl(window.location.href, token);
+      window.location.href = response.url;
+    } catch (error) {
+      console.error('Failed to open portal:', error);
+      alert('ポータルを開けませんでした');
     }
   }
 
@@ -209,7 +250,51 @@ export default function DashboardPage() {
               有効期限: {new Date(entitlement.valid_until).toLocaleDateString('ja-JP')}
             </div>
           )}
+
+          {/* Subscription Management */}
+          <div className="mt-6 pt-6 border-t flex gap-3">
+            <button
+              onClick={handleOpenPortal}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 text-sm"
+            >
+              請求管理
+            </button>
+            <button
+              onClick={() => setShowCancelConfirm(true)}
+              className="px-4 py-2 bg-red-50 text-red-600 rounded hover:bg-red-100 text-sm"
+            >
+              解約
+            </button>
+          </div>
         </div>
+
+        {/* Cancel Confirmation Modal */}
+        {showCancelConfirm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md mx-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">サブスクリプションを解約しますか？</h3>
+              <p className="text-gray-600 mb-6">
+                解約すると、現在の請求期間終了時にサービスをご利用いただけなくなります。
+                それまでは引き続きご利用いただけます。
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowCancelConfirm(false)}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={handleCancelSubscription}
+                  disabled={canceling}
+                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                >
+                  {canceling ? '処理中...' : '解約する'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       ) : (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6">
           <h2 className="text-lg font-semibold text-yellow-800 mb-2">プラン未登録</h2>
