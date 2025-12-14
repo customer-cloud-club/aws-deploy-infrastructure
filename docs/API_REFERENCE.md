@@ -4,7 +4,7 @@
 
 Platform APIは共通認証・課金基盤の全機能にアクセスするためのREST APIです。
 
-**Base URL**: `https://p8uhqklb43.execute-api.ap-northeast-1.amazonaws.com/development`
+**Base URL**: `https://wqqr3nryw0.execute-api.ap-northeast-1.amazonaws.com/dev`
 
 ## 認証
 

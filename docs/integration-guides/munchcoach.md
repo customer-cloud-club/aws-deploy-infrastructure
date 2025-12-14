@@ -26,7 +26,7 @@ Firebase AuthからCognitoへの移行が必要です。
 COGNITO_USER_POOL_ID=ap-northeast-1_lSPtvbFS7
 COGNITO_CLIENT_ID=<共通基盤のClient ID>
 PRODUCT_ID=munchcoach
-PLATFORM_API_URL=https://p8uhqklb43.execute-api.ap-northeast-1.amazonaws.com/development
+PLATFORM_API_URL=https://wqqr3nryw0.execute-api.ap-northeast-1.amazonaws.com/dev
 
 # Firebase設定は移行期間中維持
 FIREBASE_API_KEY=xxx
@@ -89,7 +89,7 @@ import { PlatformSDK } from '@aidreams/platform-sdk';
 
 PlatformSDK.init({
   productId: 'munchcoach',
-  apiUrl: 'https://p8uhqklb43.execute-api.ap-northeast-1.amazonaws.com/development',
+  apiUrl: 'https://wqqr3nryw0.execute-api.ap-northeast-1.amazonaws.com/dev',
 });
 
 // ディープリンクハンドラー

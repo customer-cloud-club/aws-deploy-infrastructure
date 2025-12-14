@@ -29,7 +29,7 @@ COGNITO_CLIENT_ID=old_client_id
 COGNITO_USER_POOL_ID=ap-northeast-1_lSPtvbFS7
 COGNITO_CLIENT_ID=<共通基盤のClient ID>
 PRODUCT_ID=ai-dream-factory
-PLATFORM_API_URL=https://p8uhqklb43.execute-api.ap-northeast-1.amazonaws.com/development
+PLATFORM_API_URL=https://wqqr3nryw0.execute-api.ap-northeast-1.amazonaws.com/dev
 ```
 
 ### Step 2: SDKインストール（オプション）

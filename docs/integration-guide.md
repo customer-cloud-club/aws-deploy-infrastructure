@@ -78,7 +78,7 @@ npm install @customer-cloud-club/platform-sdk amazon-cognito-identity-js
 # .env.local (Next.js) または .env
 
 # 必須
-NEXT_PUBLIC_PLATFORM_API_URL=https://p8uhqklb43.execute-api.ap-northeast-1.amazonaws.com/development
+NEXT_PUBLIC_PLATFORM_API_URL=https://wqqr3nryw0.execute-api.ap-northeast-1.amazonaws.com/dev
 NEXT_PUBLIC_PRODUCT_ID=your_product_id
 
 # オプション（Cognito直接認証を使う場合）
@@ -847,7 +847,7 @@ aws cognito-idp admin-add-user-to-group \
 
 ```bash
 # Admin APIでプロダクトを作成
-curl -X POST https://p8uhqklb43.execute-api.ap-northeast-1.amazonaws.com/development/admin/products \
+curl -X POST https://wqqr3nryw0.execute-api.ap-northeast-1.amazonaws.com/dev/admin/products \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -871,7 +871,7 @@ curl -X POST https://p8uhqklb43.execute-api.ap-northeast-1.amazonaws.com/develop
 
 ```bash
 # Freeプラン
-curl -X POST https://p8uhqklb43.execute-api.ap-northeast-1.amazonaws.com/development/admin/plans \
+curl -X POST https://wqqr3nryw0.execute-api.ap-northeast-1.amazonaws.com/dev/admin/plans \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -892,7 +892,7 @@ curl -X POST https://p8uhqklb43.execute-api.ap-northeast-1.amazonaws.com/develop
   }'
 
 # Proプラン
-curl -X POST https://p8uhqklb43.execute-api.ap-northeast-1.amazonaws.com/development/admin/plans \
+curl -X POST https://wqqr3nryw0.execute-api.ap-northeast-1.amazonaws.com/dev/admin/plans \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{

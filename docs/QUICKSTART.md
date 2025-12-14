@@ -37,8 +37,13 @@ npm install @customer-cloud-club/platform-sdk amazon-cognito-identity-js
 `.env.local`に以下を追加:
 
 ```bash
+# プロダクト識別子（Admin Consoleで登録したID）
 NEXT_PUBLIC_PRODUCT_ID=your-product-name
-NEXT_PUBLIC_PLATFORM_API_URL=https://p8uhqklb43.execute-api.ap-northeast-1.amazonaws.com/development
+
+# API Gateway エンドポイント（Dev環境）
+NEXT_PUBLIC_PLATFORM_API_URL=https://wqqr3nryw0.execute-api.ap-northeast-1.amazonaws.com/dev
+
+# Cognito設定（Dev環境）
 NEXT_PUBLIC_COGNITO_USER_POOL_ID=ap-northeast-1_lSPtvbFS7
 NEXT_PUBLIC_COGNITO_CLIENT_ID=5nm9g294deq3r8dl8qkq33eohp
 ```
