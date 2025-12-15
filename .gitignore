@@ -45,3 +45,4 @@ scripts/env*.json
 sdk/dist/
 sdk/.npmrc
 lambda/.serverless/
+examples
