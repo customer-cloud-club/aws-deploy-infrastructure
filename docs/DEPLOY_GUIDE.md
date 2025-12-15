@@ -294,6 +294,212 @@ terraform destroy
 
 ---
 
+## API Gateway カスタムドメイン設定
+
+API Gatewayにカスタムドメインでアクセスできるようにするためのセットアップ手順です。
+
+### 前提条件
+
+- Route53でホストゾーンが設定されていること
+- 対象のAWSアカウントへのアクセス権限があること
+
+### 環境別ドメイン例
+
+| 環境 | ドメイン例 |
+|------|-----------|
+| Dev | `cc-auth-dev.your-domain.com` |
+| Prod | `cc-auth.your-domain.com` |
+
+### Step 1: ACM証明書の作成
+
+API Gatewayアカウントで証明書を作成します。
+
+```bash
+# 環境変数設定
+export DOMAIN_NAME="cc-auth-dev.your-domain.com"  # 開発用
+# export DOMAIN_NAME="cc-auth.your-domain.com"    # 本番用
+
+export API_GW_PROFILE="your-api-gateway-profile"
+export ROUTE53_PROFILE="your-route53-profile"
+export REGION="ap-northeast-1"
+
+# ACM証明書をリクエスト
+aws acm request-certificate \
+  --domain-name $DOMAIN_NAME \
+  --validation-method DNS \
+  --region $REGION \
+  --profile $API_GW_PROFILE
+
+# 証明書ARNを取得（出力をメモ）
+# 例: arn:aws:acm:ap-northeast-1:123456789012:certificate/xxx-xxx-xxx
+```
+
+### Step 2: DNS検証レコードの追加
+
+```bash
+# 証明書ARNを設定
+export CERT_ARN="arn:aws:acm:ap-northeast-1:123456789012:certificate/xxx-xxx-xxx"
+
+# DNS検証レコード情報を取得
+aws acm describe-certificate \
+  --certificate-arn $CERT_ARN \
+  --region $REGION \
+  --profile $API_GW_PROFILE \
+  --query 'Certificate.DomainValidationOptions[0].ResourceRecord'
+
+# 出力例:
+# {
+#     "Name": "_abc123.cc-auth-dev.your-domain.com.",
+#     "Type": "CNAME",
+#     "Value": "_xyz789.acm-validations.aws."
+# }
+
+# Route53ホストゾーンIDを取得
+HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name \
+  --dns-name your-domain.com \
+  --profile $ROUTE53_PROFILE \
+  --query 'HostedZones[0].Id' \
+  --output text | sed 's|/hostedzone/||')
+
+echo "Hosted Zone ID: $HOSTED_ZONE_ID"
+
+# DNS検証レコードを追加（上記で取得した値を使用）
+aws route53 change-resource-record-sets \
+  --hosted-zone-id $HOSTED_ZONE_ID \
+  --profile $ROUTE53_PROFILE \
+  --change-batch '{
+    "Changes": [{
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "_abc123.cc-auth-dev.your-domain.com.",
+        "Type": "CNAME",
+        "TTL": 300,
+        "ResourceRecords": [{"Value": "_xyz789.acm-validations.aws."}]
+      }
+    }]
+  }'
+```
+
+### Step 3: 証明書発行を待機
+
+```bash
+# 証明書ステータスを確認（ISSUED になるまで待機）
+aws acm describe-certificate \
+  --certificate-arn $CERT_ARN \
+  --region $REGION \
+  --profile $API_GW_PROFILE \
+  --query 'Certificate.Status'
+
+# 通常1-5分で ISSUED になります
+```
+
+### Step 4: API Gatewayカスタムドメイン作成
+
+```bash
+# API Gateway IDを取得
+API_ID=$(aws apigateway get-rest-apis \
+  --region $REGION \
+  --profile $API_GW_PROFILE \
+  --query "items[?name=='dev-auth-billing'].id" \
+  --output text)
+
+# 本番の場合: items[?name=='prod-auth-billing'].id
+
+echo "API Gateway ID: $API_ID"
+
+# カスタムドメインを作成
+aws apigateway create-domain-name \
+  --domain-name $DOMAIN_NAME \
+  --regional-certificate-arn $CERT_ARN \
+  --endpoint-configuration types=REGIONAL \
+  --security-policy TLS_1_2 \
+  --region $REGION \
+  --profile $API_GW_PROFILE
+
+# 出力から regionalDomainName と regionalHostedZoneId をメモ
+# 例:
+# "regionalDomainName": "d-abc123.execute-api.ap-northeast-1.amazonaws.com"
+# "regionalHostedZoneId": "Z1YSHQZHG15GKL"
+```
+
+### Step 5: ベースパスマッピング作成
+
+```bash
+# ステージ名を設定（dev または prod）
+STAGE="dev"
+
+# ベースパスマッピングを作成
+aws apigateway create-base-path-mapping \
+  --domain-name $DOMAIN_NAME \
+  --rest-api-id $API_ID \
+  --stage $STAGE \
+  --region $REGION \
+  --profile $API_GW_PROFILE
+```
+
+### Step 6: Route53 Aliasレコード作成
+
+```bash
+# Step 4で取得した値を設定
+REGIONAL_DOMAIN="d-abc123.execute-api.ap-northeast-1.amazonaws.com"
+REGIONAL_HOSTED_ZONE_ID="Z1YSHQZHG15GKL"
+
+# Route53にAliasレコードを作成
+aws route53 change-resource-record-sets \
+  --hosted-zone-id $HOSTED_ZONE_ID \
+  --profile $ROUTE53_PROFILE \
+  --change-batch '{
+    "Changes": [{
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "'$DOMAIN_NAME'",
+        "Type": "A",
+        "AliasTarget": {
+          "HostedZoneId": "'$REGIONAL_HOSTED_ZONE_ID'",
+          "DNSName": "'$REGIONAL_DOMAIN'",
+          "EvaluateTargetHealth": false
+        }
+      }
+    }]
+  }'
+```
+
+### Step 7: 動作確認
+
+```bash
+# DNS伝播を待機（通常数秒〜数分）
+sleep 15
+
+# エンドポイントをテスト
+curl https://$DOMAIN_NAME/catalog/products
+
+# 期待される応答:
+# {"items":[...],"total":3,"page":1,"per_page":20,"has_more":false}
+```
+
+### クロスアカウント設定時の注意
+
+Route53とAPI Gatewayが異なるAWSアカウントにある場合：
+
+1. **Route53アカウント**でDNSレコードを管理
+2. **API Gatewayアカウント**でACM証明書とカスタムドメインを作成
+3. 両方のアカウントの認証情報が必要
+
+```bash
+# 例: 2つのアカウントを使用
+export ROUTE53_PROFILE="route53-account-profile"      # Route53があるアカウント
+export API_GW_PROFILE="api-gateway-account-profile"   # API Gatewayがあるアカウント
+```
+
+### 設定済み環境
+
+| 環境 | ドメイン | API Gateway ID |
+|------|----------|----------------|
+| Dev | `cc-auth-dev.aidreams-factory.com` | `mq1rpmutq0` |
+| Prod | `cc-auth.aidreams-factory.com` | `9sdlempnx9` |
+
+---
+
 ## サポート
 
 問題が解決しない場合は、以下の情報と共にSlackで相談してください：
