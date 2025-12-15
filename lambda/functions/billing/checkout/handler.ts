@@ -15,7 +15,7 @@
 
 import { APIGatewayProxyHandler, APIGatewayProxyResult } from 'aws-lambda';
 import { getStripeClient } from '../stripe.js';
-import { query } from '../../../shared/db/index.js';
+import { initializeDatabase, query } from '../../../shared/db/index.js';
 import type { CheckoutSessionRequest, CheckoutSessionResponse } from '../types.js';
 
 /**
@@ -164,6 +164,9 @@ async function createCheckoutSession(
   userId: string,
   request: CheckoutSessionRequest
 ): Promise<any> {
+  // Initialize database connection
+  await initializeDatabase();
+
   // Look up internal plan_id and trial_period_days from the stripe_price_id
   // request.plan_id is the Stripe price ID (e.g., price_xxx)
   let internalPlanId: string | undefined;
@@ -177,6 +180,8 @@ async function createCheckoutSession(
       internalPlanId = planResult.rows[0]!.id;
       trialPeriodDays = planResult.rows[0]!.trial_period_days || undefined;
       console.log('[CheckoutHandler] Found internal plan_id:', internalPlanId, 'trial_period_days:', trialPeriodDays);
+    } else {
+      console.warn('[CheckoutHandler] Plan not found for stripe_price_id:', request.plan_id);
     }
   } catch (err) {
     console.warn('[CheckoutHandler] Could not look up internal plan_id:', err);
