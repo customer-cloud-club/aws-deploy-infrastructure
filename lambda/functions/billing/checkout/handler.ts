@@ -164,17 +164,19 @@ async function createCheckoutSession(
   userId: string,
   request: CheckoutSessionRequest
 ): Promise<any> {
-  // Look up internal plan_id from the stripe_price_id
+  // Look up internal plan_id and trial_period_days from the stripe_price_id
   // request.plan_id is the Stripe price ID (e.g., price_xxx)
   let internalPlanId: string | undefined;
+  let trialPeriodDays: number | undefined;
   try {
-    const planResult = await query<{ id: string }>(
-      'SELECT id FROM plans WHERE stripe_price_id = $1',
+    const planResult = await query<{ id: string; trial_period_days: number | null }>(
+      'SELECT id, trial_period_days FROM plans WHERE stripe_price_id = $1',
       [request.plan_id]
     );
     if (planResult.rows.length > 0) {
       internalPlanId = planResult.rows[0]!.id;
-      console.log('[CheckoutHandler] Found internal plan_id:', internalPlanId);
+      trialPeriodDays = planResult.rows[0]!.trial_period_days || undefined;
+      console.log('[CheckoutHandler] Found internal plan_id:', internalPlanId, 'trial_period_days:', trialPeriodDays);
     }
   } catch (err) {
     console.warn('[CheckoutHandler] Could not look up internal plan_id:', err);
@@ -206,13 +208,15 @@ async function createCheckoutSession(
     billing_address_collection: 'auto',
     // Automatically assign customer email from session
     customer_email: undefined, // Will be collected during checkout
-    // Set subscription data
+    // Set subscription data with trial period
     subscription_data: {
       metadata: {
         user_id: userId,
         product_id: request.product_id,
         plan_id: internalPlanId || '',
       },
+      // Apply trial period if configured in the plan
+      ...(trialPeriodDays ? { trial_period_days: trialPeriodDays } : {}),
     },
     // Consent collection (if required for terms of service)
     consent_collection: {
