@@ -27,7 +27,7 @@ COGNITO_CLIENT_ID=old_client_id
 
 # 変更後（共通基盤 - Dev環境）
 COGNITO_USER_POOL_ID=ap-northeast-1_lSPtvbFS7
-COGNITO_CLIENT_ID=<Dev用Client ID>
+COGNITO_CLIENT_ID=5nm9g294deq3r8dl8qkq33eohp
 PRODUCT_ID=ai-dream-factory
 PLATFORM_API_URL=https://cc-auth-dev.aidreams-factory.com
 ```
@@ -37,7 +37,7 @@ PLATFORM_API_URL=https://cc-auth-dev.aidreams-factory.com
 ```bash
 # 共通基盤 - Prod環境
 COGNITO_USER_POOL_ID=ap-northeast-1_z76s7mTve
-COGNITO_CLIENT_ID=<Prod用Client ID>
+COGNITO_CLIENT_ID=6qpglrhtneplr9jvfcq4jpnr7r
 PRODUCT_ID=ai-dream-factory
 PLATFORM_API_URL=https://cc-auth.aidreams-factory.com
 ```

@@ -45,14 +45,14 @@ NEXT_PUBLIC_PLATFORM_PRODUCT_ID=your_product_id
 # ========================================
 NEXT_PUBLIC_PLATFORM_API_URL=https://cc-auth-dev.aidreams-factory.com
 NEXT_PUBLIC_COGNITO_USER_POOL_ID=ap-northeast-1_lSPtvbFS7
-NEXT_PUBLIC_COGNITO_CLIENT_ID=<Dev用Client ID>
+NEXT_PUBLIC_COGNITO_CLIENT_ID=5nm9g294deq3r8dl8qkq33eohp
 
 # ========================================
 # 本番環境（Prod）の場合は以下を使用
 # ========================================
 # NEXT_PUBLIC_PLATFORM_API_URL=https://cc-auth.aidreams-factory.com
 # NEXT_PUBLIC_COGNITO_USER_POOL_ID=ap-northeast-1_z76s7mTve
-# NEXT_PUBLIC_COGNITO_CLIENT_ID=<Prod用Client ID>
+# NEXT_PUBLIC_COGNITO_CLIENT_ID=6qpglrhtneplr9jvfcq4jpnr7r
 ```
 
 ### 環境別エンドポイント一覧
