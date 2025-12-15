@@ -86,26 +86,27 @@ output "lambda_security_group_id" {
 }
 
 # API Gateway Outputs (Serverless Framework managed)
-output "api_gateway_id" {
-  description = "API Gateway REST API ID (Serverless managed)"
-  value       = data.aws_api_gateway_rest_api.serverless.id
-}
+# Uncomment after Serverless deployment
+# output "api_gateway_id" {
+#   description = "API Gateway REST API ID (Serverless managed)"
+#   value       = data.aws_api_gateway_rest_api.serverless.id
+# }
+#
+# output "api_gateway_invoke_url" {
+#   description = "API Gateway invoke URL (Serverless managed)"
+#   value       = "https://${data.aws_api_gateway_rest_api.serverless.id}.execute-api.ap-northeast-1.amazonaws.com/${data.aws_api_gateway_stage.serverless.stage_name}"
+# }
 
-output "api_gateway_invoke_url" {
-  description = "API Gateway invoke URL (Serverless managed)"
-  value       = "https://${data.aws_api_gateway_rest_api.serverless.id}.execute-api.ap-northeast-1.amazonaws.com/${data.aws_api_gateway_stage.serverless.stage_name}"
-}
-
-# CloudFront Outputs
-output "cloudfront_distribution_id" {
-  description = "CloudFront distribution ID"
-  value       = module.cloudfront.distribution_id
-}
-
-output "cloudfront_domain_name" {
-  description = "CloudFront distribution domain name"
-  value       = module.cloudfront.distribution_domain_name
-}
+# CloudFront Outputs - Uncomment after CloudFront module is enabled
+# output "cloudfront_distribution_id" {
+#   description = "CloudFront distribution ID"
+#   value       = module.cloudfront.distribution_id
+# }
+#
+# output "cloudfront_domain_name" {
+#   description = "CloudFront distribution domain name"
+#   value       = module.cloudfront.distribution_domain_name
+# }
 
 # S3 Outputs
 output "s3_audit_bucket_name" {

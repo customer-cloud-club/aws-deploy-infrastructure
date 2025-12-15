@@ -9,7 +9,7 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "auth-billing-terraform-state"
+    bucket         = "auth-billing-prod-terraform-state-661103479219"
     key            = "prod/terraform.tfstate"
     region         = "ap-northeast-1"
     dynamodb_table = "terraform-locks"
@@ -236,57 +236,62 @@ data "aws_caller_identity" "current" {}
 # - WAF, KMS, S3 Audit Logs
 # ============================================================
 
-# Data source for Serverless Framework deployed API Gateway
-data "aws_api_gateway_rest_api" "serverless" {
-  name = "prod-auth-billing"  # Serverless creates: {stage}-{service}
-}
+# ============================================================
+# NOTE: CloudFront module commented out for initial deployment
+# Uncomment after Serverless Framework deploys the API Gateway
+# ============================================================
 
-data "aws_api_gateway_stage" "serverless" {
-  rest_api_id = data.aws_api_gateway_rest_api.serverless.id
-  stage_name  = "prod"
-}
-
-# CloudFront Distribution with Lambda@Edge
-module "cloudfront" {
-  source = "../../modules/cloudfront"
-
-  providers = {
-    aws           = aws
-    aws.us_east_1 = aws.us_east_1
-  }
-
-  name        = "${local.project_name}-${local.environment}"
-  environment = local.environment
-
-  origins = [
-    {
-      # Reference Serverless Framework deployed API Gateway
-      domain_name = "${data.aws_api_gateway_rest_api.serverless.id}.execute-api.${var.aws_region}.amazonaws.com"
-      origin_id   = "api-gateway"
-      origin_path = "/${data.aws_api_gateway_stage.serverless.stage_name}"
-      custom_origin_config = {
-        http_port              = 80
-        https_port             = 443
-        origin_protocol_policy = "https-only"
-        origin_ssl_protocols   = ["TLSv1.2"]
-      }
-    }
-  ]
-  default_origin_id = "api-gateway"
-
-  cognito_user_pool_id = module.cognito.user_pool_id
-
-  # Production WAF - requires CLOUDFRONT scope Web ACL
-  web_acl_id = null  # TODO: Add CloudFront-scope WAF
-
-  # Enable Lambda@Edge auth in production
-  enable_auth = true
-
-  price_class = var.cloudfront_price_class
-  enable_ipv6 = var.cloudfront_enable_ipv6
-
-  tags = local.common_tags
-}
+# # Data source for Serverless Framework deployed API Gateway
+# data "aws_api_gateway_rest_api" "serverless" {
+#   name = "prod-auth-billing"  # Serverless creates: {stage}-{service}
+# }
+#
+# data "aws_api_gateway_stage" "serverless" {
+#   rest_api_id = data.aws_api_gateway_rest_api.serverless.id
+#   stage_name  = "prod"
+# }
+#
+# # CloudFront Distribution with Lambda@Edge
+# module "cloudfront" {
+#   source = "../../modules/cloudfront"
+#
+#   providers = {
+#     aws           = aws
+#     aws.us_east_1 = aws.us_east_1
+#   }
+#
+#   name        = "${local.project_name}-${local.environment}"
+#   environment = local.environment
+#
+#   origins = [
+#     {
+#       # Reference Serverless Framework deployed API Gateway
+#       domain_name = "${data.aws_api_gateway_rest_api.serverless.id}.execute-api.${var.aws_region}.amazonaws.com"
+#       origin_id   = "api-gateway"
+#       origin_path = "/${data.aws_api_gateway_stage.serverless.stage_name}"
+#       custom_origin_config = {
+#         http_port              = 80
+#         https_port             = 443
+#         origin_protocol_policy = "https-only"
+#         origin_ssl_protocols   = ["TLSv1.2"]
+#       }
+#     }
+#   ]
+#   default_origin_id = "api-gateway"
+#
+#   cognito_user_pool_id = module.cognito.user_pool_id
+#
+#   # Production WAF - requires CLOUDFRONT scope Web ACL
+#   web_acl_id = null  # TODO: Add CloudFront-scope WAF
+#
+#   # Enable Lambda@Edge auth in production
+#   enable_auth = true
+#
+#   price_class = var.cloudfront_price_class
+#   enable_ipv6 = var.cloudfront_enable_ipv6
+#
+#   tags = local.common_tags
+# }
 
 # S3 Audit Log Bucket
 module "s3_audit" {
