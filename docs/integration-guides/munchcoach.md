@@ -19,18 +19,38 @@ Firebase AuthからCognitoへの移行が必要です。
 
 ### Step 1: 環境変数を追加
 
-`.env.production`を更新:
+#### 開発環境 (`.env.development`)
 
 ```bash
-# 共通基盤設定を追加
+# 共通基盤設定（Dev環境）
 COGNITO_USER_POOL_ID=ap-northeast-1_lSPtvbFS7
-COGNITO_CLIENT_ID=<共通基盤のClient ID>
+COGNITO_CLIENT_ID=<Dev用Client ID>
 PRODUCT_ID=munchcoach
-PLATFORM_API_URL=https://wqqr3nryw0.execute-api.ap-northeast-1.amazonaws.com/dev
+PLATFORM_API_URL=https://cc-auth-dev.aidreams-factory.com
 
 # Firebase設定は移行期間中維持
 FIREBASE_API_KEY=xxx
 ```
+
+#### 本番環境 (`.env.production`)
+
+```bash
+# 共通基盤設定（Prod環境）
+COGNITO_USER_POOL_ID=ap-northeast-1_z76s7mTve
+COGNITO_CLIENT_ID=<Prod用Client ID>
+PRODUCT_ID=munchcoach
+PLATFORM_API_URL=https://cc-auth.aidreams-factory.com
+
+# Firebase設定は移行期間中維持
+FIREBASE_API_KEY=xxx
+```
+
+#### 環境別エンドポイント
+
+| 環境 | API URL | Cognito User Pool |
+|------|---------|-------------------|
+| Dev | `https://cc-auth-dev.aidreams-factory.com` | `ap-northeast-1_lSPtvbFS7` |
+| Prod | `https://cc-auth.aidreams-factory.com` | `ap-northeast-1_z76s7mTve` |
 
 ### Step 2: SDKインストール
 
@@ -87,10 +107,17 @@ React Native用の認証フロー:
 import { Linking } from 'react-native';
 import { PlatformSDK } from '@aidreams/platform-sdk';
 
+// 開発環境
 PlatformSDK.init({
   productId: 'munchcoach',
-  apiUrl: 'https://wqqr3nryw0.execute-api.ap-northeast-1.amazonaws.com/dev',
+  apiUrl: 'https://cc-auth-dev.aidreams-factory.com',
 });
+
+// 本番環境の場合
+// PlatformSDK.init({
+//   productId: 'munchcoach',
+//   apiUrl: 'https://cc-auth.aidreams-factory.com',
+// });
 
 // ディープリンクハンドラー
 Linking.addEventListener('url', async (event) => {

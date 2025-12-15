@@ -18,19 +18,36 @@
 
 ### Step 1: 環境変数を変更
 
-`.env.production`を更新:
+#### 開発環境 (`.env.development`)
 
 ```bash
 # 変更前（既存設定）
 COGNITO_USER_POOL_ID=ap-northeast-1_OLD_POOL
 COGNITO_CLIENT_ID=old_client_id
 
-# 変更後（共通基盤）
+# 変更後（共通基盤 - Dev環境）
 COGNITO_USER_POOL_ID=ap-northeast-1_lSPtvbFS7
-COGNITO_CLIENT_ID=<共通基盤のClient ID>
+COGNITO_CLIENT_ID=<Dev用Client ID>
 PRODUCT_ID=ai-dream-factory
-PLATFORM_API_URL=https://wqqr3nryw0.execute-api.ap-northeast-1.amazonaws.com/dev
+PLATFORM_API_URL=https://cc-auth-dev.aidreams-factory.com
 ```
+
+#### 本番環境 (`.env.production`)
+
+```bash
+# 共通基盤 - Prod環境
+COGNITO_USER_POOL_ID=ap-northeast-1_z76s7mTve
+COGNITO_CLIENT_ID=<Prod用Client ID>
+PRODUCT_ID=ai-dream-factory
+PLATFORM_API_URL=https://cc-auth.aidreams-factory.com
+```
+
+#### 環境別エンドポイント
+
+| 環境 | API URL | Cognito User Pool |
+|------|---------|-------------------|
+| Dev | `https://cc-auth-dev.aidreams-factory.com` | `ap-northeast-1_lSPtvbFS7` |
+| Prod | `https://cc-auth.aidreams-factory.com` | `ap-northeast-1_z76s7mTve` |
 
 ### Step 2: SDKインストール（オプション）
 

@@ -38,13 +38,29 @@ npm install @customer-cloud-club/platform-sdk
 
 ```bash
 # 必須
-NEXT_PUBLIC_PLATFORM_API_URL=https://wqqr3nryw0.execute-api.ap-northeast-1.amazonaws.com/dev
 NEXT_PUBLIC_PLATFORM_PRODUCT_ID=your_product_id
 
-# 認証（Cognito）
-NEXT_PUBLIC_COGNITO_USER_POOL_ID=ap-northeast-1_xxxxxxxxx
-NEXT_PUBLIC_COGNITO_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
+# ========================================
+# 開発環境（Dev）
+# ========================================
+NEXT_PUBLIC_PLATFORM_API_URL=https://cc-auth-dev.aidreams-factory.com
+NEXT_PUBLIC_COGNITO_USER_POOL_ID=ap-northeast-1_lSPtvbFS7
+NEXT_PUBLIC_COGNITO_CLIENT_ID=<Dev用Client ID>
+
+# ========================================
+# 本番環境（Prod）の場合は以下を使用
+# ========================================
+# NEXT_PUBLIC_PLATFORM_API_URL=https://cc-auth.aidreams-factory.com
+# NEXT_PUBLIC_COGNITO_USER_POOL_ID=ap-northeast-1_z76s7mTve
+# NEXT_PUBLIC_COGNITO_CLIENT_ID=<Prod用Client ID>
 ```
+
+### 環境別エンドポイント一覧
+
+| 環境 | API URL | Cognito User Pool |
+|------|---------|-------------------|
+| Dev | `https://cc-auth-dev.aidreams-factory.com` | `ap-northeast-1_lSPtvbFS7` |
+| Prod | `https://cc-auth.aidreams-factory.com` | `ap-northeast-1_z76s7mTve` |
 
 ## Step 3: SDK初期化 (1分)
 
