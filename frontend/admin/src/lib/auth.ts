@@ -50,9 +50,31 @@ export async function signInUser(email: string, password: string) {
  */
 export async function signOutUser() {
   try {
-    await signOut();
+    await signOut({ global: true });
+    // Clear all local storage related to Cognito
+    if (typeof window !== 'undefined') {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('CognitoIdentityServiceProvider') || key.startsWith('amplify'))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+    }
   } catch (error) {
     console.error('Sign out error:', error);
+    // Even if sign out fails, clear local storage
+    if (typeof window !== 'undefined') {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('CognitoIdentityServiceProvider') || key.startsWith('amplify'))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+    }
     throw error;
   }
 }

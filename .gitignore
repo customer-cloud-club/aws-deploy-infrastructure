@@ -46,3 +46,4 @@ sdk/dist/
 sdk/.npmrc
 lambda/.serverless/
 examples
+frontend/admin/.env.production

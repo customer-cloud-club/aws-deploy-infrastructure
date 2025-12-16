@@ -50,9 +50,9 @@ NEXT_PUBLIC_COGNITO_CLIENT_ID=5nm9g294deq3r8dl8qkq33eohp
 # ========================================
 # 本番環境（Prod）の場合
 # ========================================
-# NEXT_PUBLIC_PLATFORM_API_URL=https://cc-auth.aidreams-factory.com
-# NEXT_PUBLIC_COGNITO_USER_POOL_ID=ap-northeast-1_z76s7mTve
-# NEXT_PUBLIC_COGNITO_CLIENT_ID=6qpglrhtneplr9jvfcq4jpnr7r
+NEXT_PUBLIC_PLATFORM_API_URL=https://cc-auth.aidreams-factory.com
+NEXT_PUBLIC_COGNITO_USER_POOL_ID=ap-northeast-1_z76s7mTve
+NEXT_PUBLIC_COGNITO_CLIENT_ID=6qpglrhtneplr9jvfcq4jpnr7r
 ```
 
 #### 環境別エンドポイント一覧
