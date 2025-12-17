@@ -282,3 +282,75 @@ resource "aws_api_gateway_gateway_response" "default_5xx" {
     "gatewayresponse.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
   }
 }
+
+# CORS headers on UNAUTHORIZED (Cognito Authorizer errors)
+resource "aws_api_gateway_gateway_response" "unauthorized" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  response_type = "UNAUTHORIZED"
+
+  response_parameters = {
+    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
+    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "gatewayresponse.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
+  }
+
+  response_templates = {
+    "application/json" = jsonencode({
+      message = "Unauthorized"
+    })
+  }
+}
+
+# CORS headers on MISSING_AUTHENTICATION_TOKEN
+resource "aws_api_gateway_gateway_response" "missing_auth_token" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  response_type = "MISSING_AUTHENTICATION_TOKEN"
+
+  response_parameters = {
+    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
+    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "gatewayresponse.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
+  }
+
+  response_templates = {
+    "application/json" = jsonencode({
+      message = "Missing Authentication Token"
+    })
+  }
+}
+
+# CORS headers on EXPIRED_TOKEN
+resource "aws_api_gateway_gateway_response" "expired_token" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  response_type = "EXPIRED_TOKEN"
+
+  response_parameters = {
+    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
+    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "gatewayresponse.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
+  }
+
+  response_templates = {
+    "application/json" = jsonencode({
+      message = "Token has expired"
+    })
+  }
+}
+
+# CORS headers on ACCESS_DENIED
+resource "aws_api_gateway_gateway_response" "access_denied" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  response_type = "ACCESS_DENIED"
+
+  response_parameters = {
+    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
+    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "gatewayresponse.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
+  }
+
+  response_templates = {
+    "application/json" = jsonencode({
+      message = "Access denied"
+    })
+  }
+}

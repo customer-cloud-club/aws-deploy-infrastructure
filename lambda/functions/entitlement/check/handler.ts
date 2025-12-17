@@ -102,15 +102,15 @@ export const handler: APIGatewayProxyHandler = async (event): Promise<APIGateway
       };
     }
 
-    // Get product_id from query parameters
-    const productId = event.queryStringParameters?.['product_id'];
+    // Get product_id from query parameters (support both productId and product_id for SDK compatibility)
+    const productId = event.queryStringParameters?.['productId'] ?? event.queryStringParameters?.['product_id'];
     if (!productId) {
       return {
         statusCode: 400,
         headers: corsHeaders,
         body: JSON.stringify({
           error: 'Bad Request',
-          message: 'Missing required parameter: product_id',
+          message: 'Missing required parameter: productId or product_id',
         }),
       };
     }
