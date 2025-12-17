@@ -36,6 +36,12 @@ const cognitoClient = new CognitoIdentityProviderClient({
 
 const USER_POOL_ID = process.env.COGNITO_USER_POOL_ID!;
 
+interface UserProduct {
+  id: string;
+  name: string;
+  lastLoginAt: string;
+}
+
 interface UserResponse {
   id: string;
   name: string;
@@ -45,6 +51,7 @@ interface UserResponse {
   lastLogin: string;
   createdAt: string;
   emailVerified: boolean;
+  products?: UserProduct[];
 }
 
 interface CreateUserRequest {
@@ -66,6 +73,52 @@ interface UserProductLogin {
   first_login_at: string;
   last_login_at: string;
   login_count: number;
+}
+
+/**
+ * Get products for multiple users (batch)
+ */
+async function getUsersProducts(userIds: string[]): Promise<Map<string, UserProduct[]>> {
+  const result = new Map<string, UserProduct[]>();
+
+  if (userIds.length === 0) {
+    return result;
+  }
+
+  try {
+    const placeholders = userIds.map((_, i) => `$${i + 1}`).join(', ');
+    const queryResult = await query<{
+      user_id: string;
+      product_id: string;
+      product_name: string;
+      last_login_at: Date;
+    }>(
+      `SELECT
+        upl.user_id,
+        upl.product_id as product_id,
+        COALESCE(p.name, upl.product_id) as product_name,
+        upl.last_login_at
+       FROM user_product_logins upl
+       LEFT JOIN products p ON upl.product_id = p.id
+       WHERE upl.user_id IN (${placeholders})
+       ORDER BY upl.last_login_at DESC`,
+      userIds
+    );
+
+    for (const row of queryResult.rows) {
+      const products = result.get(row.user_id) || [];
+      products.push({
+        id: row.product_id,
+        name: row.product_name || row.product_id,
+        lastLoginAt: row.last_login_at?.toISOString() || '',
+      });
+      result.set(row.user_id, products);
+    }
+  } catch (error) {
+    console.warn('[Users] Failed to get users products:', error);
+  }
+
+  return result;
 }
 
 /**
@@ -130,6 +183,7 @@ export async function listUsers(queryParams: Record<string, string | undefined> 
   try {
     const limit = Math.min(60, parseInt(queryParams?.['limit'] || '20'));
     const paginationToken = queryParams?.['next_token'];
+    const includeProducts = queryParams?.['include_products'] !== 'false';
 
     const response = await cognitoClient.send(new ListUsersCommand({
       UserPoolId: USER_POOL_ID,
@@ -140,6 +194,16 @@ export async function listUsers(queryParams: Record<string, string | undefined> 
     const users = await Promise.all(
       (response.Users || []).map(user => toUserResponse(user))
     );
+
+    // Fetch products for all users if requested
+    if (includeProducts && users.length > 0) {
+      const userIds = users.map(u => u.id);
+      const usersProducts = await getUsersProducts(userIds);
+
+      for (const user of users) {
+        user.products = usersProducts.get(user.id) || [];
+      }
+    }
 
     return {
       statusCode: 200,

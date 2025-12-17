@@ -7,6 +7,12 @@ import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import apiClient from '@/lib/api';
 
+interface UserProduct {
+  id: string;
+  name: string;
+  lastLoginAt: string;
+}
+
 interface User {
   id: string;
   name: string;
@@ -16,6 +22,15 @@ interface User {
   lastLogin: string;
   createdAt: string;
   emailVerified: boolean;
+  products?: UserProduct[];
+}
+
+interface UserLoginHistory {
+  product_id: string;
+  product_name: string;
+  first_login_at: string;
+  last_login_at: string;
+  login_count: number;
 }
 
 interface UsersResponse {
@@ -41,6 +56,9 @@ export default function UsersPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm] = useState<CreateUserRequest>({ email: '', name: '', role: 'user' });
   const [creating, setCreating] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [userLogins, setUserLogins] = useState<UserLoginHistory[]>([]);
+  const [loadingLogins, setLoadingLogins] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -119,6 +137,36 @@ export default function UsersPage() {
       console.error('Failed to delete user:', err);
       alert(err instanceof Error ? err.message : 'Failed to delete user');
     }
+  };
+
+  const handleOpenUserDetail = async (user: User) => {
+    setSelectedUser(user);
+    setUserLogins([]);
+    setLoadingLogins(true);
+
+    try {
+      const response = await apiClient.get<{ logins: UserLoginHistory[] }>(
+        `/admin/users/${encodeURIComponent(user.id)}/logins`
+      );
+      setUserLogins(response.logins || []);
+    } catch (err) {
+      console.error('Failed to fetch user logins:', err);
+    } finally {
+      setLoadingLogins(false);
+    }
+  };
+
+  const getProductBadgeColor = (productId: string) => {
+    const colors = [
+      'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+      'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
+      'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
+      'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
+      'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300',
+      'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-300',
+    ];
+    const hash = productId.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
+    return colors[hash % colors.length];
   };
 
   const formatDate = (dateStr: string) => {
@@ -205,6 +253,7 @@ export default function UsersPage() {
                   <tr className="border-b">
                     <th className="text-left py-3 px-4 font-medium">{t('users.fields.name')}</th>
                     <th className="text-left py-3 px-4 font-medium">{t('users.fields.email')}</th>
+                    <th className="text-left py-3 px-4 font-medium">Services</th>
                     <th className="text-left py-3 px-4 font-medium">{t('users.fields.role')}</th>
                     <th className="text-left py-3 px-4 font-medium">{t('users.fields.status')}</th>
                     <th className="text-left py-3 px-4 font-medium">{t('users.fields.lastLogin')}</th>
@@ -213,9 +262,37 @@ export default function UsersPage() {
                 </thead>
                 <tbody>
                   {filteredUsers.map((user) => (
-                    <tr key={user.id} className="border-b hover:bg-accent/50 transition-colors">
+                    <tr
+                      key={user.id}
+                      className="border-b hover:bg-accent/50 transition-colors cursor-pointer"
+                      onClick={() => handleOpenUserDetail(user)}
+                    >
                       <td className="py-3 px-4 font-medium">{user.name}</td>
                       <td className="py-3 px-4 text-muted-foreground">{user.email}</td>
+                      <td className="py-3 px-4">
+                        <div className="flex flex-wrap gap-1 max-w-xs">
+                          {user.products && user.products.length > 0 ? (
+                            <>
+                              {user.products.slice(0, 3).map((product) => (
+                                <span
+                                  key={product.id}
+                                  className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getProductBadgeColor(product.id)}`}
+                                  title={`Last: ${formatDate(product.lastLoginAt)}`}
+                                >
+                                  {product.name}
+                                </span>
+                              ))}
+                              {user.products.length > 3 && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                                  +{user.products.length - 3}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">-</span>
+                          )}
+                        </div>
+                      </td>
                       <td className="py-3 px-4">
                         <span
                           className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeColor(
@@ -238,7 +315,7 @@ export default function UsersPage() {
                       </td>
                       <td className="py-3 px-4 text-muted-foreground">{formatDate(user.lastLogin)}</td>
                       <td className="py-3 px-4">
-                        <div className="flex gap-2">
+                        <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                           <Button variant="ghost" size="sm" onClick={() => handleToggleStatus(user)}>
                             {user.status === 'active' ? 'Disable' : 'Enable'}
                           </Button>
@@ -342,6 +419,111 @@ export default function UsersPage() {
                   {creating ? 'Creating...' : 'Create User'}
                 </Button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Detail Modal */}
+      {selectedUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setSelectedUser(null)}>
+          <div className="bg-background rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold">User Details</h2>
+              <button
+                onClick={() => setSelectedUser(null)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* User Info */}
+            <div className="bg-accent/30 rounded-lg p-4 mb-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Name</p>
+                  <p className="font-medium">{selectedUser.name}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Email</p>
+                  <p className="font-medium">{selectedUser.email}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Role</p>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeColor(selectedUser.role)}`}>
+                    {t(`users.roles.${selectedUser.role}`)}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Status</p>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    selectedUser.status === 'active'
+                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                      : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
+                  }`}>
+                    {selectedUser.status}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Created</p>
+                  <p className="font-medium">{formatDate(selectedUser.createdAt)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Last Login</p>
+                  <p className="font-medium">{formatDate(selectedUser.lastLogin)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Service Usage */}
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Service Usage History</h3>
+              {loadingLogins ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                </div>
+              ) : userLogins.length > 0 ? (
+                <div className="space-y-3">
+                  {userLogins.map((login) => (
+                    <div
+                      key={login.product_id}
+                      className="border rounded-lg p-4 hover:bg-accent/30 transition-colors"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`inline-flex items-center px-3 py-1 rounded text-sm font-medium ${getProductBadgeColor(login.product_id)}`}>
+                          {login.product_name}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          {login.login_count} logins
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">First Login: </span>
+                          <span>{formatDate(login.first_login_at)}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Last Login: </span>
+                          <span>{formatDate(login.last_login_at)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  No service usage history
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end mt-6">
+              <Button variant="secondary" onClick={() => setSelectedUser(null)}>
+                Close
+              </Button>
             </div>
           </div>
         </div>
