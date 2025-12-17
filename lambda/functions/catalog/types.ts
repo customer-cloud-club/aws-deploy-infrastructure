@@ -269,6 +269,217 @@ export interface AdminCheckResult {
   user_id?: string;
 }
 
+// ============================================
+// Coupon Types
+// ============================================
+
+/**
+ * Coupon duration type
+ */
+export type CouponDuration = 'once' | 'repeating' | 'forever';
+
+/**
+ * Database row structure for coupons table
+ */
+export interface CouponRow {
+  /** Unique coupon ID */
+  id: string;
+  /** Stripe Coupon ID */
+  stripe_coupon_id: string;
+  /** Coupon name */
+  name: string;
+  /** Percentage discount (mutually exclusive with amount_off) */
+  percent_off: number | null;
+  /** Fixed amount discount (mutually exclusive with percent_off) */
+  amount_off: number | null;
+  /** Currency for amount_off */
+  currency: string | null;
+  /** Duration type */
+  duration: CouponDuration;
+  /** Number of months (for repeating duration) */
+  duration_in_months: number | null;
+  /** Maximum redemptions */
+  max_redemptions: number | null;
+  /** Number of times redeemed */
+  times_redeemed: number;
+  /** Expiration timestamp */
+  redeem_by: Date | null;
+  /** Whether the coupon is active */
+  is_active: boolean;
+  /** Additional metadata */
+  metadata: Record<string, unknown>;
+  /** Creation timestamp */
+  created_at: Date;
+  /** Last update timestamp */
+  updated_at: Date;
+  /** Soft delete timestamp */
+  deleted_at: Date | null;
+}
+
+/**
+ * Request body for POST /admin/coupons
+ */
+export interface CreateCouponRequest {
+  /** Coupon name (displayed to customers) */
+  name: string;
+  /** Percentage discount (1-100) */
+  percent_off?: number;
+  /** Fixed amount discount */
+  amount_off?: number;
+  /** Currency for amount_off (required if amount_off is set) */
+  currency?: string;
+  /** Duration type */
+  duration: CouponDuration;
+  /** Number of months for repeating duration */
+  duration_in_months?: number;
+  /** Maximum redemptions */
+  max_redemptions?: number;
+  /** Expiration date (ISO string) */
+  redeem_by?: string;
+  /** Additional metadata */
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Request body for PUT /admin/coupons/{id}
+ */
+export interface UpdateCouponRequest {
+  /** Coupon name */
+  name?: string;
+  /** Additional metadata */
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Coupon API response
+ */
+export interface CouponResponse {
+  /** Coupon ID */
+  id: string;
+  /** Stripe Coupon ID */
+  stripe_coupon_id: string;
+  /** Coupon name */
+  name: string;
+  /** Percentage discount */
+  percent_off: number | null;
+  /** Fixed amount discount */
+  amount_off: number | null;
+  /** Currency */
+  currency: string | null;
+  /** Duration type */
+  duration: CouponDuration;
+  /** Duration in months */
+  duration_in_months: number | null;
+  /** Maximum redemptions */
+  max_redemptions: number | null;
+  /** Times redeemed */
+  times_redeemed: number;
+  /** Expiration timestamp */
+  redeem_by: string | null;
+  /** Whether the coupon is active */
+  is_active: boolean;
+  /** Additional metadata */
+  metadata: Record<string, unknown>;
+  /** Creation timestamp */
+  created_at: string;
+  /** Last update timestamp */
+  updated_at: string;
+}
+
+/**
+ * Database row structure for promotion codes table
+ */
+export interface PromotionCodeRow {
+  /** Unique promotion code ID */
+  id: string;
+  /** Stripe Promotion Code ID */
+  stripe_promotion_code_id: string;
+  /** Coupon ID (foreign key) */
+  coupon_id: string;
+  /** The actual code customers enter */
+  code: string;
+  /** Whether the code is active */
+  is_active: boolean;
+  /** Maximum redemptions */
+  max_redemptions: number | null;
+  /** Number of times redeemed */
+  times_redeemed: number;
+  /** Expiration timestamp */
+  expires_at: Date | null;
+  /** Minimum amount required for order */
+  minimum_amount: number | null;
+  /** Currency for minimum_amount */
+  minimum_amount_currency: string | null;
+  /** Restrict to first-time customers only */
+  first_time_transaction: boolean;
+  /** Additional metadata */
+  metadata: Record<string, unknown>;
+  /** Creation timestamp */
+  created_at: Date;
+  /** Last update timestamp */
+  updated_at: Date;
+  /** Soft delete timestamp */
+  deleted_at: Date | null;
+}
+
+/**
+ * Request body for POST /admin/promotion-codes
+ */
+export interface CreatePromotionCodeRequest {
+  /** Coupon ID to reference */
+  coupon_id: string;
+  /** The code customers enter (auto-generated if not provided) */
+  code?: string;
+  /** Maximum redemptions */
+  max_redemptions?: number;
+  /** Expiration date (ISO string) */
+  expires_at?: string;
+  /** Minimum order amount */
+  minimum_amount?: number;
+  /** Currency for minimum_amount */
+  minimum_amount_currency?: string;
+  /** First-time customers only */
+  first_time_transaction?: boolean;
+  /** Additional metadata */
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Promotion Code API response
+ */
+export interface PromotionCodeResponse {
+  /** Promotion Code ID */
+  id: string;
+  /** Stripe Promotion Code ID */
+  stripe_promotion_code_id: string;
+  /** Coupon ID */
+  coupon_id: string;
+  /** The actual code */
+  code: string;
+  /** Whether the code is active */
+  is_active: boolean;
+  /** Maximum redemptions */
+  max_redemptions: number | null;
+  /** Times redeemed */
+  times_redeemed: number;
+  /** Expiration timestamp */
+  expires_at: string | null;
+  /** Minimum amount */
+  minimum_amount: number | null;
+  /** Minimum amount currency */
+  minimum_amount_currency: string | null;
+  /** First-time transaction only */
+  first_time_transaction: boolean;
+  /** Additional metadata */
+  metadata: Record<string, unknown>;
+  /** Creation timestamp */
+  created_at: string;
+  /** Last update timestamp */
+  updated_at: string;
+  /** Associated coupon details */
+  coupon?: CouponResponse;
+}
+
 /**
  * Cache keys for catalog service
  */
@@ -285,6 +496,14 @@ export const CatalogCacheKeys = {
   tenant: (id: string): string => `catalog:tenant:${id}`,
   /** All tenants cache key */
   tenants: (): string => 'catalog:tenants:all',
+  /** Coupon cache key */
+  coupon: (id: string): string => `catalog:coupon:${id}`,
+  /** All coupons cache key */
+  coupons: (): string => 'catalog:coupons:all',
+  /** Promotion code cache key */
+  promotionCode: (id: string): string => `catalog:promotion-code:${id}`,
+  /** All promotion codes cache key */
+  promotionCodes: (): string => 'catalog:promotion-codes:all',
 } as const;
 
 /**
@@ -297,4 +516,8 @@ export const CatalogCacheTTL = {
   PLAN: 3600,
   /** Tenant data TTL: 5 minutes */
   TENANT: 300,
+  /** Coupon data TTL: 30 minutes */
+  COUPON: 1800,
+  /** Promotion code data TTL: 30 minutes */
+  PROMOTION_CODE: 1800,
 } as const;

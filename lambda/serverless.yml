@@ -72,6 +72,7 @@ provider:
             - cognito-idp:AdminAddUserToGroup
             - cognito-idp:AdminRemoveUserFromGroup
             - cognito-idp:AdminListGroupsForUser
+            - cognito-idp:AdminDeleteUser
           Resource: ${self:custom.env.cognito.userPoolArn}
 
 custom:
@@ -154,6 +155,28 @@ functions:
           authorizer:
             type: COGNITO_USER_POOLS
             authorizerId: !Ref ApiGatewayAuthorizer
+
+  # Auth API (password reset, account deletion)
+  authApi:
+    handler: dist/functions/auth/api/handler.handler
+    memorySize: 256
+    timeout: 30
+    vpc: ~  # No VPC needed for Cognito operations
+    environment:
+      COGNITO_CLIENT_ID: ${self:custom.env.cognito.clientId}
+    events:
+      - http:
+          path: auth/reset-password
+          method: post
+          cors: true
+      - http:
+          path: auth/reset-password/confirm
+          method: post
+          cors: true
+      - http:
+          path: auth/account
+          method: delete
+          cors: true
 
   # Checkout handler
   checkoutHandler:

@@ -7,6 +7,7 @@
     "dashboard": "Dashboard",
     "products": "Products",
     "plans": "Plans",
+    "coupons": "Coupons",
     "users": "Users",
     "settings": "Settings"
   },
@@ -97,6 +98,38 @@
       "admin": "Admin",
       "superAdmin": "Super Admin",
       "user": "User"
+    }
+  },
+  "coupons": {
+    "title": "Coupons",
+    "addCoupon": "Create Coupon",
+    "editCoupon": "Edit Coupon",
+    "deleteCoupon": "Delete Coupon",
+    "fields": {
+      "name": "Coupon Name",
+      "discount": "Discount",
+      "duration": "Duration",
+      "maxRedemptions": "Max Redemptions",
+      "timesRedeemed": "Times Redeemed",
+      "redeemBy": "Expiration Date",
+      "status": "Status"
+    },
+    "duration": {
+      "once": "Once",
+      "repeating": "Repeating",
+      "forever": "Forever"
+    },
+    "promotionCodes": {
+      "title": "Promotion Codes",
+      "addCode": "Create Code",
+      "fields": {
+        "code": "Code",
+        "coupon": "Coupon",
+        "maxRedemptions": "Max Redemptions",
+        "expiresAt": "Expires At",
+        "minimumAmount": "Minimum Amount",
+        "firstTimeOnly": "First-time Only"
+      }
     }
   }
 }

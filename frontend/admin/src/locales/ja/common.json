@@ -7,6 +7,7 @@
     "dashboard": "ダッシュボード",
     "products": "プロダクト管理",
     "plans": "プラン管理",
+    "coupons": "クーポン管理",
     "users": "ユーザー管理",
     "settings": "設定"
   },
@@ -97,6 +98,38 @@
       "admin": "管理者",
       "superAdmin": "スーパー管理者",
       "user": "一般ユーザー"
+    }
+  },
+  "coupons": {
+    "title": "クーポン管理",
+    "addCoupon": "クーポンを作成",
+    "editCoupon": "クーポンを編集",
+    "deleteCoupon": "クーポンを削除",
+    "fields": {
+      "name": "クーポン名",
+      "discount": "割引",
+      "duration": "適用期間",
+      "maxRedemptions": "最大利用回数",
+      "timesRedeemed": "利用済み回数",
+      "redeemBy": "有効期限",
+      "status": "ステータス"
+    },
+    "duration": {
+      "once": "初回のみ",
+      "repeating": "繰り返し",
+      "forever": "永続"
+    },
+    "promotionCodes": {
+      "title": "プロモーションコード",
+      "addCode": "コードを作成",
+      "fields": {
+        "code": "コード",
+        "coupon": "クーポン",
+        "maxRedemptions": "最大利用回数",
+        "expiresAt": "有効期限",
+        "minimumAmount": "最小購入額",
+        "firstTimeOnly": "初回購入のみ"
+      }
     }
   }
 }

@@ -1,6 +1,6 @@
 /**
  * Catalog Service Lambda Handler
- * Manages products, plans, tenants, dashboard, and users
+ * Manages products, plans, tenants, dashboard, users, coupons, and promotion codes
  *
  * Public Endpoints (no auth required):
  * - GET    /catalog/products        - List products (public)
@@ -17,6 +17,19 @@
  * - DELETE /admin/plans/{id}        - Delete plan
  * - GET    /admin/tenants           - List tenants
  * - POST   /admin/tenants           - Create tenant
+ *
+ * Coupon Endpoints (admin auth required):
+ * - GET    /admin/coupons           - List coupons
+ * - GET    /admin/coupons/{id}      - Get coupon
+ * - POST   /admin/coupons           - Create coupon (with Stripe integration)
+ * - PUT    /admin/coupons/{id}      - Update coupon
+ * - DELETE /admin/coupons/{id}      - Delete coupon
+ *
+ * Promotion Code Endpoints (admin auth required):
+ * - GET    /admin/promotion-codes           - List promotion codes
+ * - GET    /admin/promotion-codes/{id}      - Get promotion code
+ * - POST   /admin/promotion-codes           - Create promotion code (with Stripe integration)
+ * - DELETE /admin/promotion-codes/{id}      - Delete promotion code
  *
  * Dashboard Endpoints (admin auth required):
  * - GET    /admin/dashboard         - Dashboard statistics
@@ -38,6 +51,7 @@ import { initializeDatabase } from '../../shared/db/index.js';
 import { getProduct, listProducts, createProduct, updateProduct, deleteProduct } from './products.js';
 import { getPlan, listPlans, createPlan, updatePlan, deletePlan } from './plans.js';
 import { getTenant, listTenants, createTenant } from './tenants.js';
+import { getCoupon, listCoupons, createCoupon, updateCoupon, deleteCoupon, getPromotionCode, listPromotionCodes, createPromotionCode, deletePromotionCode } from './coupons.js';
 import { getDashboardStats, getRevenueData, getUserGrowthData, getRecentActivity } from '../admin/dashboard.js';
 import { listUsers, getUser, createUser, updateUser, deleteUser, getUserLogins } from '../admin/users.js';
 import { AdminCheckResult } from './types.js';
@@ -213,6 +227,14 @@ export const handler: APIGatewayProxyHandler = async (event): Promise<APIGateway
 
       case 'users':
         result = await handleUsersRoute(method, resourceId, event.body, event.queryStringParameters, path);
+        break;
+
+      case 'coupons':
+        result = await handleCouponsRoute(method, resourceId, event.body, event.queryStringParameters);
+        break;
+
+      case 'promotion-codes':
+        result = await handlePromotionCodesRoute(method, resourceId, event.body, event.queryStringParameters);
         break;
 
       default:
@@ -552,6 +574,129 @@ async function handleUsersRoute(
         body: JSON.stringify({
           error: 'Method Not Allowed',
           message: `Method ${method} not allowed for users`,
+        }),
+      };
+  }
+}
+
+/**
+ * Handles /admin/coupons routes
+ */
+async function handleCouponsRoute(
+  method: string,
+  resourceId: string | null,
+  body: string | null,
+  queryParams: APIGatewayProxyEventQueryStringParameters | null
+): Promise<APIGatewayProxyResult> {
+  switch (method) {
+    case 'GET':
+      if (resourceId) {
+        // GET /admin/coupons/{id}
+        return getCoupon(resourceId);
+      }
+      // GET /admin/coupons
+      return listCoupons(queryParams);
+
+    case 'POST':
+      if (!body) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({
+            error: 'Bad Request',
+            message: 'Request body required',
+          }),
+        };
+      }
+      // POST /admin/coupons
+      return createCoupon(body);
+
+    case 'PUT':
+      if (!resourceId || !body) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({
+            error: 'Bad Request',
+            message: 'Resource ID and request body required',
+          }),
+        };
+      }
+      // PUT /admin/coupons/{id}
+      return updateCoupon(resourceId, body);
+
+    case 'DELETE':
+      if (!resourceId) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({
+            error: 'Bad Request',
+            message: 'Resource ID required',
+          }),
+        };
+      }
+      // DELETE /admin/coupons/{id}
+      return deleteCoupon(resourceId);
+
+    default:
+      return {
+        statusCode: 405,
+        body: JSON.stringify({
+          error: 'Method Not Allowed',
+          message: `Method ${method} not allowed for coupons`,
+        }),
+      };
+  }
+}
+
+/**
+ * Handles /admin/promotion-codes routes
+ */
+async function handlePromotionCodesRoute(
+  method: string,
+  resourceId: string | null,
+  body: string | null,
+  queryParams: APIGatewayProxyEventQueryStringParameters | null
+): Promise<APIGatewayProxyResult> {
+  switch (method) {
+    case 'GET':
+      if (resourceId) {
+        // GET /admin/promotion-codes/{id}
+        return getPromotionCode(resourceId);
+      }
+      // GET /admin/promotion-codes
+      return listPromotionCodes(queryParams);
+
+    case 'POST':
+      if (!body) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({
+            error: 'Bad Request',
+            message: 'Request body required',
+          }),
+        };
+      }
+      // POST /admin/promotion-codes
+      return createPromotionCode(body);
+
+    case 'DELETE':
+      if (!resourceId) {
+        return {
+          statusCode: 400,
+          body: JSON.stringify({
+            error: 'Bad Request',
+            message: 'Resource ID required',
+          }),
+        };
+      }
+      // DELETE /admin/promotion-codes/{id}
+      return deletePromotionCode(resourceId);
+
+    default:
+      return {
+        statusCode: 405,
+        body: JSON.stringify({
+          error: 'Method Not Allowed',
+          message: `Method ${method} not allowed for promotion codes`,
         }),
       };
   }
