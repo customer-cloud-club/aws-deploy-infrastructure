@@ -156,7 +156,7 @@ export default function UsersPage() {
     }
   };
 
-  const getProductBadgeColor = (productId: string) => {
+  const getProductBadgeColor = (productId: string | undefined) => {
     const colors = [
       'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
       'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
@@ -165,6 +165,7 @@ export default function UsersPage() {
       'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300',
       'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-300',
     ];
+    if (!productId) return colors[0];
     const hash = productId.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
     return colors[hash % colors.length];
   };
@@ -271,15 +272,15 @@ export default function UsersPage() {
                       <td className="py-3 px-4 text-muted-foreground">{user.email}</td>
                       <td className="py-3 px-4">
                         <div className="flex flex-wrap gap-1 max-w-xs">
-                          {user.products && user.products.length > 0 ? (
+                          {Array.isArray(user.products) && user.products.length > 0 ? (
                             <>
-                              {user.products.slice(0, 3).map((product) => (
+                              {user.products.slice(0, 3).map((product, idx) => (
                                 <span
-                                  key={product.id}
-                                  className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getProductBadgeColor(product.id)}`}
-                                  title={`Last: ${formatDate(product.lastLoginAt)}`}
+                                  key={product?.id || idx}
+                                  className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getProductBadgeColor(product?.id)}`}
+                                  title={product?.lastLoginAt ? `Last: ${formatDate(product.lastLoginAt)}` : ''}
                                 >
-                                  {product.name}
+                                  {product?.name || 'Unknown'}
                                 </span>
                               ))}
                               {user.products.length > 3 && (
