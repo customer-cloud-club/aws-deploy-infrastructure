@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '@/lib/store';
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -8,15 +9,17 @@ import Button from '@/components/ui/Button';
 
 const Header: React.FC = () => {
   const { t } = useTranslation('common');
+  const router = useRouter();
   const { theme, setTheme } = useStore();
   const { user, logout } = useAuth();
 
   const handleSignOut = async () => {
     try {
       await logout();
-      window.location.href = '/login';
     } catch (error) {
       console.error('Sign out error:', error);
+    } finally {
+      router.push('/login');
     }
   };
 

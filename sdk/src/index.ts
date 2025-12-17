@@ -4,7 +4,7 @@
  */
 
 import type { PlatformConfig, AuthUser, Entitlement, Plan, UsageRecord } from './types';
-import { initAuth, requireAuth, logout, getAuthState, setAuthTokens, handleAuthCallback, getAccessToken } from './auth';
+import { initAuth, requireAuth, logout, getAuthState, setAuthTokens, handleAuthCallback, getAccessToken, requestPasswordReset, confirmPasswordReset, deleteAccount } from './auth';
 import { initEntitlement, getEntitlement, hasFeature, checkLimit, getPlans, clearEntitlementCache } from './entitlement';
 import { initUsage, recordUsage, recordUsageBatch, incrementUsage } from './usage';
 
@@ -80,6 +80,34 @@ export class PlatformSDK {
    * ログアウト
    */
   static logout = logout;
+
+  /**
+   * パスワードリセットをリクエスト
+   * @example
+   * ```typescript
+   * await PlatformSDK.requestPasswordReset('user@example.com');
+   * // メールで確認コードが送信される
+   * ```
+   */
+  static requestPasswordReset = requestPasswordReset;
+
+  /**
+   * パスワードリセットを確認（新しいパスワードを設定）
+   * @example
+   * ```typescript
+   * await PlatformSDK.confirmPasswordReset('user@example.com', '123456', 'newPassword');
+   * ```
+   */
+  static confirmPasswordReset = confirmPasswordReset;
+
+  /**
+   * アカウントを削除
+   * @example
+   * ```typescript
+   * await PlatformSDK.deleteAccount();
+   * ```
+   */
+  static deleteAccount = deleteAccount;
 
   /**
    * 利用権を取得

@@ -1,5 +1,15 @@
 import { Amplify } from 'aws-amplify';
-import { signIn, signOut, getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
+import {
+  signIn,
+  signOut,
+  getCurrentUser,
+  fetchAuthSession,
+  resetPassword,
+  confirmResetPassword,
+  deleteUser,
+  type ResetPasswordOutput,
+  type ConfirmResetPasswordInput
+} from 'aws-amplify/auth';
 
 /**
  * Configure AWS Amplify with Cognito settings
@@ -114,5 +124,61 @@ export async function isAuthenticated(): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Request password reset - sends confirmation code to user's email
+ */
+export async function requestPasswordReset(email: string): Promise<ResetPasswordOutput> {
+  try {
+    const output = await resetPassword({ username: email });
+    return output;
+  } catch (error) {
+    console.error('Password reset request error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Confirm password reset with code and new password
+ */
+export async function confirmPasswordReset(
+  email: string,
+  confirmationCode: string,
+  newPassword: string
+): Promise<void> {
+  try {
+    await confirmResetPassword({
+      username: email,
+      confirmationCode,
+      newPassword,
+    } as ConfirmResetPasswordInput);
+  } catch (error) {
+    console.error('Password reset confirmation error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete current user's account
+ */
+export async function deleteUserAccount(): Promise<void> {
+  try {
+    await deleteUser();
+    // Clear all local storage related to Cognito
+    if (typeof window !== 'undefined') {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('CognitoIdentityServiceProvider') || key.startsWith('amplify'))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+    }
+  } catch (error) {
+    console.error('Delete user error:', error);
+    throw error;
   }
 }

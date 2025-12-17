@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { signInUser } from '@/lib/auth';
 import { useAuth } from '@/components/providers/AuthProvider';
@@ -168,6 +169,14 @@ export default function LoginPage() {
                 placeholder="パスワード"
               />
             </div>
+          </div>
+          <div className="flex items-center justify-end">
+            <Link
+              href="/login/forgot-password"
+              className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-500"
+            >
+              パスワードを忘れた場合
+            </Link>
           </div>
           <Button
             type="submit"
