@@ -25,8 +25,9 @@ redis:
 cognito:
   userPoolId: ap-northeast-1_lSPtvbFS7
   userPoolArn: arn:aws:cognito-idp:ap-northeast-1:805673386383:userpool/ap-northeast-1_lSPtvbFS7
-  clientId: ${env:COGNITO_CLIENT_ID, ''}
+  clientId: 5nm9g294deq3r8dl8qkq33eohp
   domain: auth-billing-dev.auth.ap-northeast-1.amazoncognito.com
+  callbackUrl: https://cc-auth-dev.aidreams-factory.com/auth/callback
 
 # Stripe Configuration
 stripe:

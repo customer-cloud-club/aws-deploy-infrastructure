@@ -4,11 +4,12 @@
  */
 
 import type { PlatformConfig, AuthUser, Entitlement, Plan, UsageRecord } from './types';
-import { initAuth, requireAuth, logout, getAuthState, setAuthTokens, handleAuthCallback, getAccessToken, requestPasswordReset, confirmPasswordReset, deleteAccount } from './auth';
+import { initAuth, requireAuth, logout, getAuthState, setAuthTokens, handleAuthCallback, getAccessToken, requestPasswordReset, confirmPasswordReset, deleteAccount, login, signup, confirmSignup, type LoginResponse, type SignupResponse } from './auth';
 import { initEntitlement, getEntitlement, hasFeature, checkLimit, getPlans, clearEntitlementCache } from './entitlement';
 import { initUsage, recordUsage, recordUsageBatch, incrementUsage } from './usage';
 
 export * from './types';
+export type { LoginResponse, SignupResponse } from './auth';
 
 /**
  * Platform SDK メインクラス
@@ -108,6 +109,40 @@ export class PlatformSDK {
    * ```
    */
   static deleteAccount = deleteAccount;
+
+  /**
+   * メールアドレスとパスワードでログイン
+   * @example
+   * ```typescript
+   * const result = await PlatformSDK.login('user@example.com', 'password123');
+   * if (result.challengeName) {
+   *   // MFAチャレンジが必要
+   * } else {
+   *   // ログイン成功
+   * }
+   * ```
+   */
+  static login = login;
+
+  /**
+   * メールアドレスとパスワードで新規登録
+   * @example
+   * ```typescript
+   * const result = await PlatformSDK.signup('user@example.com', 'SecurePassword1-', 'User Name');
+   * // メールで確認コードが送信される
+   * ```
+   */
+  static signup = signup;
+
+  /**
+   * サインアップ確認（メール確認コードの検証）
+   * @example
+   * ```typescript
+   * await PlatformSDK.confirmSignup('user@example.com', '123456');
+   * // 確認完了後、ログイン可能
+   * ```
+   */
+  static confirmSignup = confirmSignup;
 
   /**
    * 利用権を取得

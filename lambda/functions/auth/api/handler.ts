@@ -3,6 +3,7 @@
  * Provides authentication, password reset and account deletion endpoints
  *
  * Authentication:
+ * POST /auth/signup - Sign up with email/password
  * POST /auth/login - Login with email/password
  * POST /auth/callback - OAuth callback (authorization code exchange)
  *
@@ -23,6 +24,8 @@ import {
   GetUserCommand,
   InitiateAuthCommand,
   RespondToAuthChallengeCommand,
+  SignUpCommand,
+  ConfirmSignUpCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 
 const cognitoClient = new CognitoIdentityProviderClient({
@@ -38,6 +41,34 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
+
+/**
+ * Safely parse request body handling base64 encoding and already-parsed objects
+ */
+function parseBody(event: APIGatewayProxyEvent): Record<string, unknown> {
+  if (!event.body) {
+    return {};
+  }
+
+  // If body is already an object (shouldn't happen with proxy integration, but just in case)
+  if (typeof event.body === 'object') {
+    return event.body as Record<string, unknown>;
+  }
+
+  let bodyString = event.body;
+
+  // Handle base64 encoded body
+  if (event.isBase64Encoded) {
+    bodyString = Buffer.from(event.body, 'base64').toString('utf-8');
+  }
+
+  try {
+    return JSON.parse(bodyString);
+  } catch (error) {
+    console.error('[Auth API] Failed to parse body:', error, 'Body:', bodyString.substring(0, 100));
+    return {};
+  }
+}
 
 export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
   console.log('[Auth API] Request:', {
@@ -58,9 +89,24 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
   const method = event.httpMethod;
 
   try {
-    // Login with email/password
+    // Redirect to Cognito Hosted UI (GET)
+    if (path === '/auth/login' && method === 'GET') {
+      return await loginRedirect(event);
+    }
+
+    // Login with email/password (POST)
     if (path === '/auth/login' && method === 'POST') {
       return await login(event);
+    }
+
+    // Sign up with email/password
+    if (path === '/auth/signup' && method === 'POST') {
+      return await signup(event);
+    }
+
+    // Confirm sign up with verification code
+    if (path === '/auth/signup/confirm' && method === 'POST') {
+      return await confirmSignup(event);
     }
 
     // OAuth callback (authorization code exchange)
@@ -104,8 +150,8 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
  */
 async function requestPasswordReset(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
   try {
-    const body = JSON.parse(event.body || '{}');
-    const { email } = body;
+    const body = parseBody(event);
+    const email = body.email as string | undefined;
 
     if (!email) {
       return {
@@ -169,8 +215,10 @@ async function requestPasswordReset(event: APIGatewayProxyEvent): Promise<APIGat
  */
 async function confirmPasswordReset(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
   try {
-    const body = JSON.parse(event.body || '{}');
-    const { email, code, newPassword } = body;
+    const body = parseBody(event);
+    const email = body.email as string | undefined;
+    const code = body.code as string | undefined;
+    const newPassword = body.newPassword as string | undefined;
 
     if (!email || !code || !newPassword) {
       return {
@@ -297,12 +345,53 @@ async function deleteAccount(event: APIGatewayProxyEvent): Promise<APIGatewayPro
 }
 
 /**
+ * Redirect to Cognito Hosted UI for OAuth login
+ */
+async function loginRedirect(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+  const cognitoDomain = process.env.COGNITO_DOMAIN || '';
+  const redirectUri = event.queryStringParameters?.redirect || '';
+  const callbackUrl = process.env.COGNITO_CALLBACK_URL || '';
+
+  if (!cognitoDomain) {
+    return {
+      statusCode: 500,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Cognito domain not configured' }),
+    };
+  }
+
+  // Store the original redirect URL in state parameter for later use
+  const state = redirectUri ? Buffer.from(redirectUri).toString('base64url') : '';
+
+  // Build Cognito Hosted UI authorization URL
+  const params = new URLSearchParams({
+    client_id: CLIENT_ID,
+    response_type: 'code',
+    scope: 'openid email profile',
+    redirect_uri: callbackUrl,
+    ...(state && { state }),
+  });
+
+  const authUrl = `https://${cognitoDomain}/oauth2/authorize?${params.toString()}`;
+
+  return {
+    statusCode: 302,
+    headers: {
+      ...corsHeaders,
+      'Location': authUrl,
+    },
+    body: '',
+  };
+}
+
+/**
  * Login with email and password
  */
 async function login(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
   try {
-    const body = JSON.parse(event.body || '{}');
-    const { email, password } = body;
+    const body = parseBody(event);
+    const email = body.email as string | undefined;
+    const password = body.password as string | undefined;
 
     if (!email || !password) {
       return {
@@ -401,12 +490,164 @@ async function login(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult
 }
 
 /**
+ * Sign up with email and password
+ */
+async function signup(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+  try {
+    const body = parseBody(event);
+    const email = body.email as string | undefined;
+    const password = body.password as string | undefined;
+    const name = body.name as string | undefined;
+
+    if (!email || !password) {
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: 'Email and password are required' }),
+      };
+    }
+
+    const userAttributes: { Name: string; Value: string }[] = [
+      { Name: 'email', Value: email },
+    ];
+
+    if (name) {
+      userAttributes.push({ Name: 'name', Value: name });
+    }
+
+    const command = new SignUpCommand({
+      ClientId: CLIENT_ID,
+      Username: email,
+      Password: password,
+      UserAttributes: userAttributes,
+    });
+
+    const response = await cognitoClient.send(command);
+
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: JSON.stringify({
+        message: 'Sign up successful. Please check your email for verification code.',
+        userSub: response.UserSub,
+        userConfirmed: response.UserConfirmed,
+        codeDeliveryDetails: response.CodeDeliveryDetails ? {
+          destination: response.CodeDeliveryDetails.Destination,
+          deliveryMedium: response.CodeDeliveryDetails.DeliveryMedium,
+          attributeName: response.CodeDeliveryDetails.AttributeName,
+        } : undefined,
+      }),
+    };
+  } catch (error: unknown) {
+    const err = error as Error & { name?: string };
+    console.error('[Auth API] Sign up error:', err);
+
+    if (err.name === 'UsernameExistsException') {
+      return {
+        statusCode: 409,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: 'An account with this email already exists' }),
+      };
+    }
+
+    if (err.name === 'InvalidPasswordException') {
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: 'Password does not meet requirements' }),
+      };
+    }
+
+    if (err.name === 'InvalidParameterException') {
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: err.message || 'Invalid parameters' }),
+      };
+    }
+
+    return {
+      statusCode: 500,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Sign up failed' }),
+    };
+  }
+}
+
+/**
+ * Confirm sign up with verification code
+ */
+async function confirmSignup(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+  try {
+    const body = parseBody(event);
+    const email = body.email as string | undefined;
+    const code = body.code as string | undefined;
+
+    if (!email || !code) {
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: 'Email and code are required' }),
+      };
+    }
+
+    const command = new ConfirmSignUpCommand({
+      ClientId: CLIENT_ID,
+      Username: email,
+      ConfirmationCode: code,
+    });
+
+    await cognitoClient.send(command);
+
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: JSON.stringify({ message: 'Email verified successfully. You can now log in.' }),
+    };
+  } catch (error: unknown) {
+    const err = error as Error & { name?: string };
+    console.error('[Auth API] Confirm sign up error:', err);
+
+    if (err.name === 'CodeMismatchException') {
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: 'Invalid verification code' }),
+      };
+    }
+
+    if (err.name === 'ExpiredCodeException') {
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: 'Verification code has expired' }),
+      };
+    }
+
+    if (err.name === 'NotAuthorizedException') {
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: 'User is already confirmed' }),
+      };
+    }
+
+    return {
+      statusCode: 500,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Verification failed' }),
+    };
+  }
+}
+
+/**
  * OAuth callback - exchange authorization code for tokens
  */
 async function callback(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
   try {
-    const body = JSON.parse(event.body || '{}');
-    const { code, redirectUri } = body;
+    const body = parseBody(event);
+    const code = body.code as string | undefined;
+    const redirectUri = body.redirectUri as string | undefined;
 
     if (!code) {
       return {

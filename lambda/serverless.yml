@@ -165,9 +165,22 @@ functions:
     environment:
       COGNITO_CLIENT_ID: ${self:custom.env.cognito.clientId}
       COGNITO_DOMAIN: ${self:custom.env.cognito.domain, ''}
+      COGNITO_CALLBACK_URL: ${self:custom.env.cognito.callbackUrl, ''}
     events:
       - http:
           path: auth/login
+          method: get
+          cors: true
+      - http:
+          path: auth/login
+          method: post
+          cors: true
+      - http:
+          path: auth/signup
+          method: post
+          cors: true
+      - http:
+          path: auth/signup/confirm
           method: post
           cors: true
       - http:
