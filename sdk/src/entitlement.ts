@@ -32,7 +32,7 @@ export async function getEntitlement(forceRefresh = false): Promise<Entitlement>
     throw new Error('Not authenticated');
   }
 
-  const response = await fetch(`${config.apiUrl}/entitlements?productId=${config.productId}`, {
+  const response = await fetch(`${config.apiUrl}/me/entitlements?productId=${config.productId}`, {
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
