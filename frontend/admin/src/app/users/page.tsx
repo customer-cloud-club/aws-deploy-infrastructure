@@ -15,6 +15,7 @@ interface UserProduct {
 
 interface User {
   id: string;
+  sub: string;  // Cognito sub (UUID) for database lookups
   name: string;
   email: string;
   role: 'admin' | 'superAdmin' | 'user';

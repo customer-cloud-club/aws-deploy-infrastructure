@@ -44,6 +44,7 @@ interface UserProduct {
 
 interface UserResponse {
   id: string;
+  sub: string;  // Cognito sub (UUID) for database lookups
   name: string;
   email: string;
   role: 'admin' | 'superAdmin' | 'user';
@@ -95,8 +96,8 @@ async function getUsersProducts(userIds: string[]): Promise<Map<string, UserProd
     }>(
       `SELECT
         upl.user_id,
-        upl.product_id as product_id,
-        COALESCE(p.name, upl.product_id) as product_name,
+        upl.product_id::text as product_id,
+        COALESCE(p.name, upl.product_id::text) as product_name,
         upl.last_login_at
        FROM user_product_logins upl
        LEFT JOIN products p ON upl.product_id = p.id
@@ -165,6 +166,7 @@ async function toUserResponse(cognitoUser: {
 
   return {
     id: username,
+    sub: getAttribute(cognitoUser.Attributes, 'sub'),  // Cognito sub (UUID)
     name: getAttribute(cognitoUser.Attributes, 'name') || getAttribute(cognitoUser.Attributes, 'email')?.split('@')[0] || username,
     email: getAttribute(cognitoUser.Attributes, 'email'),
     role,
@@ -196,12 +198,13 @@ export async function listUsers(queryParams: Record<string, string | undefined> 
     );
 
     // Fetch products for all users if requested
+    // Use Cognito sub (UUID) for database lookup, as user_product_logins stores sub
     if (includeProducts && users.length > 0) {
-      const userIds = users.map(u => u.id);
-      const usersProducts = await getUsersProducts(userIds);
+      const userSubs = users.map(u => u.sub).filter(sub => sub);  // Filter out empty subs
+      const usersProducts = await getUsersProducts(userSubs);
 
       for (const user of users) {
-        user.products = usersProducts.get(user.id) || [];
+        user.products = usersProducts.get(user.sub) || [];
       }
     }
 

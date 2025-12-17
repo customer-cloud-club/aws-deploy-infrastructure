@@ -25,6 +25,8 @@ async function recordVerifiedEmail(userId: string, email?: string): Promise<void
   if (!email) return;
 
   try {
+    // Ensure database is initialized before querying
+    await initializeDatabase();
     await query(
       `INSERT INTO verified_emails (email, user_id, first_verified_at)
        VALUES ($1, $2, NOW())
@@ -44,6 +46,8 @@ async function recordVerifiedEmail(userId: string, email?: string): Promise<void
  */
 async function recordUserProductLogin(userId: string, productId: string, email?: string): Promise<void> {
   try {
+    // Ensure database is initialized before querying
+    await initializeDatabase();
     await query(
       `INSERT INTO user_product_logins (user_id, product_id, email, first_login_at, last_login_at, login_count)
        VALUES ($1, $2, $3, NOW(), NOW(), 1)
