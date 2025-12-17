@@ -30,7 +30,11 @@ PlatformSDK.init({
   apiUrl: 'https://api.example.com',
 });
 
-// 認証必須（未ログインなら自動リダイレクト）
+// ログイン（メール/パスワード）
+const loginResult = await PlatformSDK.login('user@example.com', 'password123');
+console.log('Logged in!');
+
+// または認証必須（未ログインなら自動リダイレクト）
 const user = await PlatformSDK.requireAuth();
 console.log('Welcome,', user.email);
 
@@ -68,11 +72,18 @@ PlatformSDK.init(config: PlatformConfig): void
 
 | メソッド | 説明 |
 |---------|------|
+| `login(email, password)` | メール/パスワードでログイン |
+| `signup(email, password, name?)` | 新規ユーザー登録 |
+| `confirmSignup(email, code)` | サインアップ確認 |
 | `requireAuth()` | 認証必須。未認証ならリダイレクト |
 | `getAuthState()` | 現在の認証状態を取得 |
 | `getAccessToken()` | アクセストークンを取得 |
 | `setAuthTokens(...)` | トークンを設定（サーバーサイド用） |
+| `handleAuthCallback(code)` | OAuthコールバック処理 |
 | `logout()` | ログアウト |
+| `requestPasswordReset(email)` | パスワードリセット要求 |
+| `confirmPasswordReset(...)` | パスワードリセット確認 |
+| `deleteAccount()` | アカウント削除 |
 
 ### エンタイトルメント
 
@@ -122,6 +133,26 @@ interface Entitlement {
   limits: UsageLimits;
   currentUsage: CurrentUsage;
   expiresAt?: string;
+}
+
+interface LoginResponse {
+  accessToken: string;
+  idToken: string;
+  refreshToken?: string;
+  expiresIn: number;
+  tokenType: string;
+  challengeName?: string;  // MFA必要時
+  session?: string;
+}
+
+interface SignupResponse {
+  message: string;
+  userSub: string;
+  userConfirmed: boolean;
+  codeDeliveryDetails?: {
+    destination: string;
+    deliveryMedium: string;
+  };
 }
 ```
 

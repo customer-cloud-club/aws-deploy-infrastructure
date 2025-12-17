@@ -190,6 +190,141 @@ async function handleLogout() {
 
 ---
 
+### `PlatformSDK.login(email, password)`
+
+メールアドレスとパスワードでログインします。
+
+**パラメータ:**
+
+| 名前 | 型 | 説明 |
+|------|-----|------|
+| `email` | `string` | メールアドレス |
+| `password` | `string` | パスワード |
+
+**戻り値:** `Promise<LoginResponse>`
+
+```typescript
+const result = await PlatformSDK.login('user@example.com', 'password123');
+
+if (result.challengeName) {
+  // MFAチャレンジが必要
+  console.log('MFA required:', result.challengeName);
+} else {
+  // ログイン成功
+  console.log('Logged in!');
+}
+```
+
+---
+
+### `PlatformSDK.signup(email, password, name?)`
+
+新規ユーザー登録を行います。登録後、確認コードがメールで送信されます。
+
+**パラメータ:**
+
+| 名前 | 型 | 必須 | 説明 |
+|------|-----|------|------|
+| `email` | `string` | ✅ | メールアドレス |
+| `password` | `string` | ✅ | パスワード |
+| `name` | `string` | - | 表示名 |
+
+**戻り値:** `Promise<SignupResponse>`
+
+```typescript
+const result = await PlatformSDK.signup(
+  'user@example.com',
+  'SecurePassword123!',
+  'User Name'
+);
+
+console.log('User ID:', result.userSub);
+// メールで確認コードが送信される
+```
+
+---
+
+### `PlatformSDK.confirmSignup(email, code)`
+
+サインアップ確認（メール確認コードの検証）を行います。
+
+**パラメータ:**
+
+| 名前 | 型 | 説明 |
+|------|-----|------|
+| `email` | `string` | メールアドレス |
+| `code` | `string` | 確認コード（6桁） |
+
+**戻り値:** `Promise<void>`
+
+```typescript
+await PlatformSDK.confirmSignup('user@example.com', '123456');
+// 確認完了後、ログイン可能
+```
+
+---
+
+### `PlatformSDK.requestPasswordReset(email)`
+
+パスワードリセットをリクエストします。確認コードがメールで送信されます。
+
+**パラメータ:**
+
+| 名前 | 型 | 説明 |
+|------|-----|------|
+| `email` | `string` | メールアドレス |
+
+**戻り値:** `Promise<{ deliveryMedium: string; destination: string }>`
+
+```typescript
+const result = await PlatformSDK.requestPasswordReset('user@example.com');
+console.log('確認コード送信先:', result.destination);
+// メールで確認コードが送信される
+```
+
+---
+
+### `PlatformSDK.confirmPasswordReset(email, code, newPassword)`
+
+パスワードリセットを確認し、新しいパスワードを設定します。
+
+**パラメータ:**
+
+| 名前 | 型 | 説明 |
+|------|-----|------|
+| `email` | `string` | メールアドレス |
+| `code` | `string` | 確認コード（6桁） |
+| `newPassword` | `string` | 新しいパスワード |
+
+**戻り値:** `Promise<void>`
+
+```typescript
+await PlatformSDK.confirmPasswordReset(
+  'user@example.com',
+  '123456',
+  'NewSecurePassword123!'
+);
+// パスワードリセット完了
+```
+
+---
+
+### `PlatformSDK.deleteAccount()`
+
+現在ログイン中のアカウントを削除します。この操作は取り消せません。
+
+**戻り値:** `Promise<void>`
+
+```typescript
+if (confirm('本当にアカウントを削除しますか？')) {
+  await PlatformSDK.deleteAccount();
+  // アカウント削除後、自動的にログアウトされる
+  window.location.href = '/';
+}
+```
+
+---
+
 ## 利用権 API
 
 ### `PlatformSDK.getEntitlement(forceRefresh?)`
@@ -526,6 +661,48 @@ interface Plan {
   features: Record<string, boolean | number | string>;
   /** 使用制限 */
   limits: UsageLimits;
+}
+```
+
+### `LoginResponse`
+
+```typescript
+interface LoginResponse {
+  /** アクセストークン */
+  accessToken: string;
+  /** IDトークン */
+  idToken: string;
+  /** リフレッシュトークン */
+  refreshToken?: string;
+  /** 有効期限（秒） */
+  expiresIn: number;
+  /** トークンタイプ */
+  tokenType: string;
+  /** MFAチャレンジ名（MFA必要時のみ） */
+  challengeName?: string;
+  /** MFAセッション（MFA必要時のみ） */
+  session?: string;
+  /** チャレンジパラメータ */
+  challengeParameters?: Record<string, string>;
+}
+```
+
+### `SignupResponse`
+
+```typescript
+interface SignupResponse {
+  /** メッセージ */
+  message: string;
+  /** ユーザーID (Cognito sub) */
+  userSub: string;
+  /** メール確認済みフラグ */
+  userConfirmed: boolean;
+  /** 確認コード送信先情報 */
+  codeDeliveryDetails?: {
+    destination: string;
+    deliveryMedium: string;
+    attributeName?: string;
+  };
 }
 ```
 

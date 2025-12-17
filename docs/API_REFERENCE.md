@@ -18,6 +18,105 @@ Authorization: Bearer <access_token>
 
 ## Auth API
 
+### GET /auth/login
+
+Cognito Hosted UIへリダイレクト（OAuth認証フロー開始）
+
+**Query Parameters**
+| パラメータ | 型 | 必須 | 説明 |
+|-----------|-----|------|------|
+| redirect | string | No | 認証後のリダイレクト先URL |
+
+**Response**: `302 Redirect` to Cognito Hosted UI
+
+---
+
+### POST /auth/login
+
+メールアドレスとパスワードでログイン
+
+**Request**
+```json
+{
+  "email": "user@example.com",
+  "password": "SecurePassword123!"
+}
+```
+
+**Response**
+```json
+{
+  "accessToken": "eyJhbG...",
+  "idToken": "eyJhbG...",
+  "refreshToken": "eyJhbG...",
+  "expiresIn": 3600,
+  "tokenType": "Bearer"
+}
+```
+
+**MFAチャレンジの場合**
+```json
+{
+  "challengeName": "SMS_MFA",
+  "session": "session_token",
+  "challengeParameters": {
+    "CODE_DELIVERY_DESTINATION": "+81*****1234"
+  }
+}
+```
+
+---
+
+### POST /auth/signup
+
+新規ユーザー登録
+
+**Request**
+```json
+{
+  "email": "user@example.com",
+  "password": "SecurePassword123!",
+  "name": "山田 太郎"
+}
+```
+
+**Response**
+```json
+{
+  "message": "Sign up successful. Please check your email for verification code.",
+  "userSub": "abc123-def456",
+  "userConfirmed": false,
+  "codeDeliveryDetails": {
+    "destination": "u***@e***",
+    "deliveryMedium": "EMAIL",
+    "attributeName": "email"
+  }
+}
+```
+
+---
+
+### POST /auth/signup/confirm
+
+サインアップ確認（メール確認コード検証）
+
+**Request**
+```json
+{
+  "email": "user@example.com",
+  "code": "123456"
+}
+```
+
+**Response**
+```json
+{
+  "message": "Email confirmed successfully"
+}
+```
+
+---
+
 ### GET /auth/me
 
 現在のユーザー情報を取得
@@ -32,6 +131,8 @@ Authorization: Bearer <access_token>
   "createdAt": "2024-01-01T00:00:00Z"
 }
 ```
+
+---
 
 ### POST /auth/callback
 
@@ -55,6 +156,67 @@ OAuth認証コールバック処理
     "userId": "abc123",
     "email": "user@example.com"
   }
+}
+```
+
+---
+
+### POST /auth/reset-password
+
+パスワードリセットをリクエスト
+
+**Request**
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+**Response**
+```json
+{
+  "deliveryMedium": "EMAIL",
+  "destination": "u***@e***"
+}
+```
+
+---
+
+### POST /auth/reset-password/confirm
+
+パスワードリセットを確認（新しいパスワードを設定）
+
+**Request**
+```json
+{
+  "email": "user@example.com",
+  "code": "123456",
+  "newPassword": "NewSecurePassword123!"
+}
+```
+
+**Response**
+```json
+{
+  "message": "Password reset successful"
+}
+```
+
+---
+
+### DELETE /auth/account
+
+アカウントを削除（認証必須）
+
+**Headers**
+```
+Authorization: Bearer <access_token>
+```
+
+**Response**
+```json
+{
+  "message": "Account deleted successfully"
 }
 ```
 
