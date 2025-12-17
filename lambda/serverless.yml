@@ -156,7 +156,7 @@ functions:
             type: COGNITO_USER_POOLS
             authorizerId: !Ref ApiGatewayAuthorizer
 
-  # Auth API (password reset, account deletion)
+  # Auth API (login, callback, password reset, account deletion)
   authApi:
     handler: dist/functions/auth/api/handler.handler
     memorySize: 256
@@ -164,7 +164,16 @@ functions:
     vpc: ~  # No VPC needed for Cognito operations
     environment:
       COGNITO_CLIENT_ID: ${self:custom.env.cognito.clientId}
+      COGNITO_DOMAIN: ${self:custom.env.cognito.domain, ''}
     events:
+      - http:
+          path: auth/login
+          method: post
+          cors: true
+      - http:
+          path: auth/callback
+          method: post
+          cors: true
       - http:
           path: auth/reset-password
           method: post

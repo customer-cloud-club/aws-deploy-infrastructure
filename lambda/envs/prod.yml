@@ -25,6 +25,7 @@ cognito:
   userPoolId: ap-northeast-1_z76s7mTve
   userPoolArn: arn:aws:cognito-idp:ap-northeast-1:661103479219:userpool/ap-northeast-1_z76s7mTve
   clientId: 6qpglrhtneplr9jvfcq4jpnr7r
+  domain: ''  # e.g., your-domain.auth.ap-northeast-1.amazoncognito.com (for OAuth callback)
 
 # Stripe Configuration
 stripe:

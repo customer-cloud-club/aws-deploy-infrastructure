@@ -1,6 +1,10 @@
 /**
  * Auth API Handler
- * Provides password reset and account deletion endpoints
+ * Provides authentication, password reset and account deletion endpoints
+ *
+ * Authentication:
+ * POST /auth/login - Login with email/password
+ * POST /auth/callback - OAuth callback (authorization code exchange)
  *
  * Password Reset:
  * POST /auth/reset-password - Request password reset (send code)
@@ -17,6 +21,8 @@ import {
   ConfirmForgotPasswordCommand,
   AdminDeleteUserCommand,
   GetUserCommand,
+  InitiateAuthCommand,
+  RespondToAuthChallengeCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 
 const cognitoClient = new CognitoIdentityProviderClient({
@@ -52,6 +58,16 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
   const method = event.httpMethod;
 
   try {
+    // Login with email/password
+    if (path === '/auth/login' && method === 'POST') {
+      return await login(event);
+    }
+
+    // OAuth callback (authorization code exchange)
+    if (path === '/auth/callback' && method === 'POST') {
+      return await callback(event);
+    }
+
     // Password reset request
     if (path === '/auth/reset-password' && method === 'POST') {
       return await requestPasswordReset(event);
@@ -276,6 +292,186 @@ async function deleteAccount(event: APIGatewayProxyEvent): Promise<APIGatewayPro
       statusCode: 500,
       headers: corsHeaders,
       body: JSON.stringify({ error: 'Failed to delete account' }),
+    };
+  }
+}
+
+/**
+ * Login with email and password
+ */
+async function login(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+  try {
+    const body = JSON.parse(event.body || '{}');
+    const { email, password } = body;
+
+    if (!email || !password) {
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: 'Email and password are required' }),
+      };
+    }
+
+    const command = new InitiateAuthCommand({
+      AuthFlow: 'USER_PASSWORD_AUTH',
+      ClientId: CLIENT_ID,
+      AuthParameters: {
+        USERNAME: email,
+        PASSWORD: password,
+      },
+    });
+
+    const response = await cognitoClient.send(command);
+
+    // Check if MFA or other challenge is required
+    if (response.ChallengeName) {
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          challengeName: response.ChallengeName,
+          session: response.Session,
+          challengeParameters: response.ChallengeParameters,
+        }),
+      };
+    }
+
+    // Successful authentication
+    if (response.AuthenticationResult) {
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          accessToken: response.AuthenticationResult.AccessToken,
+          idToken: response.AuthenticationResult.IdToken,
+          refreshToken: response.AuthenticationResult.RefreshToken,
+          expiresIn: response.AuthenticationResult.ExpiresIn,
+          tokenType: response.AuthenticationResult.TokenType || 'Bearer',
+        }),
+      };
+    }
+
+    return {
+      statusCode: 500,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Unexpected authentication response' }),
+    };
+  } catch (error: unknown) {
+    const err = error as Error & { name?: string };
+    console.error('[Auth API] Login error:', err);
+
+    if (err.name === 'NotAuthorizedException') {
+      return {
+        statusCode: 401,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: 'Invalid email or password' }),
+      };
+    }
+
+    if (err.name === 'UserNotConfirmedException') {
+      return {
+        statusCode: 403,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: 'User is not confirmed. Please verify your email.' }),
+      };
+    }
+
+    if (err.name === 'UserNotFoundException') {
+      return {
+        statusCode: 401,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: 'Invalid email or password' }),
+      };
+    }
+
+    if (err.name === 'PasswordResetRequiredException') {
+      return {
+        statusCode: 403,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: 'Password reset required' }),
+      };
+    }
+
+    return {
+      statusCode: 500,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Login failed' }),
+    };
+  }
+}
+
+/**
+ * OAuth callback - exchange authorization code for tokens
+ */
+async function callback(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+  try {
+    const body = JSON.parse(event.body || '{}');
+    const { code, redirectUri } = body;
+
+    if (!code) {
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: 'Authorization code is required' }),
+      };
+    }
+
+    // Exchange authorization code for tokens using Cognito token endpoint
+    const cognitoDomain = process.env.COGNITO_DOMAIN || '';
+    const tokenEndpoint = `https://${cognitoDomain}/oauth2/token`;
+
+    const tokenParams = new URLSearchParams({
+      grant_type: 'authorization_code',
+      client_id: CLIENT_ID,
+      code,
+      redirect_uri: redirectUri || '',
+    });
+
+    const tokenResponse = await fetch(tokenEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: tokenParams.toString(),
+    });
+
+    if (!tokenResponse.ok) {
+      const errorData = await tokenResponse.text();
+      console.error('[Auth API] Token exchange failed:', errorData);
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: 'Failed to exchange authorization code' }),
+      };
+    }
+
+    const tokens = await tokenResponse.json() as {
+      access_token: string;
+      id_token: string;
+      refresh_token?: string;
+      expires_in: number;
+      token_type: string;
+    };
+
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: JSON.stringify({
+        accessToken: tokens.access_token,
+        idToken: tokens.id_token,
+        refreshToken: tokens.refresh_token,
+        expiresIn: tokens.expires_in,
+        tokenType: tokens.token_type || 'Bearer',
+      }),
+    };
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('[Auth API] Callback error:', err);
+
+    return {
+      statusCode: 500,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Failed to process callback' }),
     };
   }
 }
