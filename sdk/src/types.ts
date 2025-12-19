@@ -102,18 +102,28 @@ export interface UsageRecord {
 export interface Plan {
   /** プランID */
   id: string;
+  /** プロダクトID */
+  product_id: string;
   /** プラン名 */
   name: string;
-  /** 説明 */
-  description?: string;
-  /** 価格(円) */
-  price: number;
+  /** Stripe Price ID */
+  stripe_price_id: string;
   /** 課金サイクル */
-  billingCycle: 'monthly' | 'yearly' | 'one_time';
-  /** 機能フラグ */
-  features: Record<string, boolean | number | string>;
-  /** 使用制限 */
-  limits: UsageLimits;
+  billing_period: 'monthly' | 'yearly' | 'one_time';
+  /** 価格(円) */
+  price_amount: number;
+  /** 通貨 */
+  currency: string;
+  /** トライアル期間(日) */
+  trial_period_days?: number | null;
+  /** 有効フラグ */
+  is_active: boolean;
+  /** メタデータ */
+  metadata: Record<string, unknown>;
+  /** 作成日時 */
+  created_at: string;
+  /** 更新日時 */
+  updated_at: string;
 }
 
 /**
