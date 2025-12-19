@@ -3,10 +3,11 @@
  * Platform SDK for AI Dreams Factory authentication and billing integration
  */
 
-import type { PlatformConfig, AuthUser, Entitlement, Plan, UsageRecord } from './types';
+import type { PlatformConfig, AuthUser, Entitlement, Plan, UsageRecord, CheckoutRequest, CheckoutSession } from './types';
 import { initAuth, requireAuth, logout, getAuthState, setAuthTokens, handleAuthCallback, getAccessToken, requestPasswordReset, confirmPasswordReset, deleteAccount, login, signup, confirmSignup, type LoginResponse, type SignupResponse } from './auth';
 import { initEntitlement, getEntitlement, hasFeature, checkLimit, getPlans, clearEntitlementCache } from './entitlement';
 import { initUsage, recordUsage, recordUsageBatch, incrementUsage } from './usage';
+import { initBilling, createCheckout, redirectToCheckout } from './billing';
 
 export * from './types';
 export type { LoginResponse, SignupResponse } from './auth';
@@ -37,6 +38,7 @@ export class PlatformSDK {
     initAuth(config);
     initEntitlement(config);
     initUsage(config);
+    initBilling(config);
     this.initialized = true;
   }
 
@@ -211,6 +213,34 @@ export class PlatformSDK {
    * ```
    */
   static incrementUsage = incrementUsage;
+
+  /**
+   * Stripeチェックアウトセッションを作成
+   * @example
+   * ```typescript
+   * const { sessionId, url } = await PlatformSDK.createCheckout({
+   *   planId: 'price_xxx',
+   *   successUrl: 'https://myapp.com/success?session_id={CHECKOUT_SESSION_ID}',
+   *   cancelUrl: 'https://myapp.com/pricing',
+   * });
+   * window.location.href = url;
+   * ```
+   */
+  static createCheckout = createCheckout;
+
+  /**
+   * Stripeチェックアウトページへリダイレクト
+   * @example
+   * ```typescript
+   * await PlatformSDK.redirectToCheckout({
+   *   planId: 'price_xxx',
+   *   successUrl: 'https://myapp.com/success',
+   *   cancelUrl: 'https://myapp.com/pricing',
+   * });
+   * // ブラウザがStripeチェックアウトページにリダイレクト
+   * ```
+   */
+  static redirectToCheckout = redirectToCheckout;
 }
 
 // デフォルトエクスポート

@@ -117,6 +117,30 @@ export interface Plan {
 }
 
 /**
+ * チェックアウトセッションリクエスト
+ */
+export interface CheckoutRequest {
+  /** Stripe Price ID */
+  planId: string;
+  /** 成功時リダイレクトURL */
+  successUrl: string;
+  /** キャンセル時リダイレクトURL */
+  cancelUrl: string;
+  /** 追加メタデータ */
+  metadata?: Record<string, string>;
+}
+
+/**
+ * チェックアウトセッションレスポンス
+ */
+export interface CheckoutSession {
+  /** セッションID */
+  sessionId: string;
+  /** チェックアウトURL */
+  url: string;
+}
+
+/**
  * APIエラー
  */
 export class PlatformError extends Error {
