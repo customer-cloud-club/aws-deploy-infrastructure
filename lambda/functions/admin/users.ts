@@ -451,6 +451,18 @@ export async function deleteUser(userId: string): Promise<APIGatewayProxyResult>
  */
 export async function getUserLogins(userId: string): Promise<APIGatewayProxyResult> {
   try {
+    // Get user's sub (UUID) from Cognito - user_product_logins stores sub, not username
+    let userSub = userId;
+    try {
+      const cognitoUser = await cognitoClient.send(new AdminGetUserCommand({
+        UserPoolId: USER_POOL_ID,
+        Username: userId,
+      }));
+      userSub = getAttribute(cognitoUser.UserAttributes, 'sub') || userId;
+    } catch (error) {
+      console.warn('[Users] Could not get user sub, using userId as-is:', error);
+    }
+
     const result = await query<{
       product_id: string;
       product_name: string;
@@ -460,15 +472,15 @@ export async function getUserLogins(userId: string): Promise<APIGatewayProxyResu
     }>(
       `SELECT
         upl.product_id,
-        p.name as product_name,
+        COALESCE(p.name, upl.product_id::text) as product_name,
         upl.first_login_at,
         upl.last_login_at,
         upl.login_count
        FROM user_product_logins upl
-       JOIN products p ON upl.product_id = p.id
+       LEFT JOIN products p ON upl.product_id = p.id
        WHERE upl.user_id = $1
        ORDER BY upl.last_login_at DESC`,
-      [userId]
+      [userSub]
     );
 
     const logins: UserProductLogin[] = result.rows.map(row => ({
