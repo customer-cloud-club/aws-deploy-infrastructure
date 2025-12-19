@@ -2,7 +2,7 @@
  * Billing module - Stripe Checkout integration
  */
 import type { PlatformConfig, PlatformError, CheckoutRequest, CheckoutSession } from './types';
-import { getAccessToken } from './auth';
+import { getIdToken } from './auth';
 
 let config: PlatformConfig | null = null;
 
@@ -31,7 +31,7 @@ export async function createCheckout(request: CheckoutRequest): Promise<Checkout
     throw new Error('PlatformSDK not initialized');
   }
 
-  const token = await getAccessToken();
+  const token = await getIdToken();
   if (!token) {
     throw new Error('Not authenticated');
   }

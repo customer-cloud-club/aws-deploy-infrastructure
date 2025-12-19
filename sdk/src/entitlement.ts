@@ -1,5 +1,5 @@
 import type { Entitlement, PlatformConfig, PlatformError, Plan } from './types';
-import { getAccessToken } from './auth';
+import { getIdToken } from './auth';
 
 let config: PlatformConfig | null = null;
 let cachedEntitlement: Entitlement | null = null;
@@ -27,7 +27,7 @@ export async function getEntitlement(forceRefresh = false): Promise<Entitlement>
     return cachedEntitlement;
   }
 
-  const token = await getAccessToken();
+  const token = await getIdToken();
   if (!token) {
     throw new Error('Not authenticated');
   }

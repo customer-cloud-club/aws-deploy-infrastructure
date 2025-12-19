@@ -1,5 +1,5 @@
 import type { PlatformConfig, UsageRecord } from './types';
-import { getAccessToken } from './auth';
+import { getIdToken } from './auth';
 import { clearEntitlementCache } from './entitlement';
 
 let config: PlatformConfig | null = null;
@@ -19,7 +19,7 @@ export async function recordUsage(amount: number, type: string = 'api_call', met
     throw new Error('PlatformSDK not initialized');
   }
 
-  const token = await getAccessToken();
+  const token = await getIdToken();
   if (!token) {
     throw new Error('Not authenticated');
   }
@@ -59,7 +59,7 @@ export async function recordUsageBatch(records: UsageRecord[]): Promise<void> {
     throw new Error('PlatformSDK not initialized');
   }
 
-  const token = await getAccessToken();
+  const token = await getIdToken();
   if (!token) {
     throw new Error('Not authenticated');
   }

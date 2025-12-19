@@ -26,6 +26,14 @@ export async function getAccessToken(): Promise<string | null> {
 }
 
 /**
+ * IDトークンを取得（Cognito Authorizer用）
+ */
+export async function getIdToken(): Promise<string | null> {
+  if (!currentUser) return null;
+  return currentUser.idToken;
+}
+
+/**
  * 認証必須チェック - 未認証なら例外
  */
 export async function requireAuth(): Promise<AuthUser> {

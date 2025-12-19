@@ -4,7 +4,7 @@
  */
 
 import type { PlatformConfig, AuthUser, Entitlement, Plan, UsageRecord, CheckoutRequest, CheckoutSession } from './types';
-import { initAuth, requireAuth, logout, getAuthState, setAuthTokens, handleAuthCallback, getAccessToken, requestPasswordReset, confirmPasswordReset, deleteAccount, login, signup, confirmSignup, type LoginResponse, type SignupResponse } from './auth';
+import { initAuth, requireAuth, logout, getAuthState, setAuthTokens, handleAuthCallback, getAccessToken, getIdToken, requestPasswordReset, confirmPasswordReset, deleteAccount, login, signup, confirmSignup, type LoginResponse, type SignupResponse } from './auth';
 import { initEntitlement, getEntitlement, hasFeature, checkLimit, getPlans, clearEntitlementCache } from './entitlement';
 import { initUsage, recordUsage, recordUsageBatch, incrementUsage } from './usage';
 import { initBilling, createCheckout, redirectToCheckout } from './billing';
@@ -68,6 +68,11 @@ export class PlatformSDK {
    * アクセストークンを取得
    */
   static getAccessToken = getAccessToken;
+
+  /**
+   * IDトークンを取得（Cognito Authorizer用）
+   */
+  static getIdToken = getIdToken;
 
   /**
    * 認証トークンを設定（サーバーサイド用）
