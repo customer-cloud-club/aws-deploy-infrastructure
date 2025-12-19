@@ -336,6 +336,8 @@ export interface CreateCouponRequest {
   max_redemptions?: number;
   /** Expiration date (ISO string) */
   redeem_by?: string;
+  /** Stripe Product IDs this coupon applies to (if not set, applies to all) */
+  applies_to_products?: string[];
   /** Additional metadata */
   metadata?: Record<string, unknown>;
 }
@@ -440,6 +442,8 @@ export interface CreatePromotionCodeRequest {
   minimum_amount_currency?: string;
   /** First-time customers only */
   first_time_transaction?: boolean;
+  /** Stripe Product IDs this promotion code applies to (overrides coupon's applies_to) */
+  applies_to_products?: string[];
   /** Additional metadata */
   metadata?: Record<string, unknown>;
 }

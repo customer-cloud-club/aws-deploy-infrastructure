@@ -386,6 +386,13 @@ export async function createCoupon(body: string): Promise<APIGatewayProxyResult>
       couponParams.redeem_by = Math.floor(new Date(request.redeem_by).getTime() / 1000);
     }
 
+    // Apply coupon to specific products only
+    if (request.applies_to_products && request.applies_to_products.length > 0) {
+      couponParams.applies_to = {
+        products: request.applies_to_products,
+      };
+    }
+
     console.log('[Coupons] Creating Stripe coupon:', couponParams);
     const stripeCoupon = await stripe.coupons.create(couponParams);
     console.log('[Coupons] Stripe coupon created:', stripeCoupon.id);
@@ -728,15 +735,24 @@ export async function createPromotionCode(body: string): Promise<APIGatewayProxy
       promoParams.expires_at = Math.floor(new Date(request.expires_at).getTime() / 1000);
     }
 
-    if (request.minimum_amount || request.first_time_transaction) {
-      promoParams.restrictions = {};
+    if (request.minimum_amount || request.first_time_transaction || request.applies_to_products) {
+      const restrictions: Stripe.PromotionCodeCreateParams.Restrictions & {
+        applies_to?: { products: string[] };
+      } = {};
       if (request.minimum_amount) {
-        promoParams.restrictions.minimum_amount = request.minimum_amount;
-        promoParams.restrictions.minimum_amount_currency = request.minimum_amount_currency?.toLowerCase() || 'jpy';
+        restrictions.minimum_amount = request.minimum_amount;
+        restrictions.minimum_amount_currency = request.minimum_amount_currency?.toLowerCase() || 'jpy';
       }
       if (request.first_time_transaction) {
-        promoParams.restrictions.first_time_transaction = true;
+        restrictions.first_time_transaction = true;
       }
+      // Apply promotion code to specific products only (overrides coupon's applies_to)
+      if (request.applies_to_products && request.applies_to_products.length > 0) {
+        restrictions.applies_to = {
+          products: request.applies_to_products,
+        };
+      }
+      promoParams.restrictions = restrictions as Stripe.PromotionCodeCreateParams.Restrictions;
     }
 
     console.log('[Coupons] Creating Stripe promotion code:', promoParams);
