@@ -18,6 +18,7 @@ import {
   AdminUpdateUserAttributesCommand,
   AdminDisableUserCommand,
   AdminEnableUserCommand,
+  AdminDeleteUserCommand,
   AdminAddUserToGroupCommand,
   AdminRemoveUserFromGroupCommand,
   AdminListGroupsForUserCommand,
@@ -413,12 +414,12 @@ export async function updateUser(userId: string, body: string): Promise<APIGatew
 }
 
 /**
- * Disable (soft delete) user
+ * Delete user permanently from Cognito
  * DELETE /admin/users/{id}
  */
 export async function deleteUser(userId: string): Promise<APIGatewayProxyResult> {
   try {
-    await cognitoClient.send(new AdminDisableUserCommand({
+    await cognitoClient.send(new AdminDeleteUserCommand({
       UserPoolId: USER_POOL_ID,
       Username: userId,
     }));
@@ -426,7 +427,7 @@ export async function deleteUser(userId: string): Promise<APIGatewayProxyResult>
     return {
       statusCode: 200,
       headers: corsHeaders,
-      body: JSON.stringify({ success: true, message: 'User disabled successfully' }),
+      body: JSON.stringify({ success: true, message: 'User deleted successfully' }),
     };
   } catch (error: any) {
     if (error.name === 'UserNotFoundException') {
