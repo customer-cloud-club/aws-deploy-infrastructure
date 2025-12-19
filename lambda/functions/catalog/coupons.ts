@@ -735,24 +735,17 @@ export async function createPromotionCode(body: string): Promise<APIGatewayProxy
       promoParams.expires_at = Math.floor(new Date(request.expires_at).getTime() / 1000);
     }
 
-    if (request.minimum_amount || request.first_time_transaction || request.applies_to_products) {
-      const restrictions: Stripe.PromotionCodeCreateParams.Restrictions & {
-        applies_to?: { products: string[] };
-      } = {};
+    // Note: Stripe doesn't support restrictions.applies_to for promotion codes
+    // Product restrictions should be set at the coupon level instead
+    if (request.minimum_amount || request.first_time_transaction) {
+      promoParams.restrictions = {};
       if (request.minimum_amount) {
-        restrictions.minimum_amount = request.minimum_amount;
-        restrictions.minimum_amount_currency = request.minimum_amount_currency?.toLowerCase() || 'jpy';
+        promoParams.restrictions.minimum_amount = request.minimum_amount;
+        promoParams.restrictions.minimum_amount_currency = request.minimum_amount_currency?.toLowerCase() || 'jpy';
       }
       if (request.first_time_transaction) {
-        restrictions.first_time_transaction = true;
+        promoParams.restrictions.first_time_transaction = true;
       }
-      // Apply promotion code to specific products only (overrides coupon's applies_to)
-      if (request.applies_to_products && request.applies_to_products.length > 0) {
-        restrictions.applies_to = {
-          products: request.applies_to_products,
-        };
-      }
-      promoParams.restrictions = restrictions as Stripe.PromotionCodeCreateParams.Restrictions;
     }
 
     console.log('[Coupons] Creating Stripe promotion code:', promoParams);

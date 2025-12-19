@@ -426,6 +426,7 @@ export interface PromotionCodeRow {
 
 /**
  * Request body for POST /admin/promotion-codes
+ * Note: Product restrictions should be set at the coupon level (applies_to_products)
  */
 export interface CreatePromotionCodeRequest {
   /** Coupon ID to reference */
@@ -442,8 +443,6 @@ export interface CreatePromotionCodeRequest {
   minimum_amount_currency?: string;
   /** First-time customers only */
   first_time_transaction?: boolean;
-  /** Stripe Product IDs this promotion code applies to (overrides coupon's applies_to) */
-  applies_to_products?: string[];
   /** Additional metadata */
   metadata?: Record<string, unknown>;
 }
