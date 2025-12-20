@@ -139,6 +139,44 @@ export const handler: APIGatewayProxyHandler = async (event): Promise<APIGateway
 };
 
 /**
+ * Check if product exists in our database
+ * Used to filter webhooks to only process events for our products
+ */
+async function isAllowedProduct(client: any, productId: string | undefined): Promise<boolean> {
+  if (!productId) return false;
+
+  const result = await client.query(
+    'SELECT 1 FROM products WHERE id = $1 LIMIT 1',
+    [productId]
+  );
+  return result.rowCount > 0;
+}
+
+/**
+ * Extract product_id from Stripe event data
+ */
+function extractProductId(stripeEvent: any): string | undefined {
+  const data = stripeEvent.data.object;
+
+  // Check metadata first (set during checkout creation)
+  if (data.metadata?.product_id) {
+    return data.metadata.product_id;
+  }
+
+  // For subscriptions, check subscription metadata
+  if (data.subscription_details?.metadata?.product_id) {
+    return data.subscription_details.metadata.product_id;
+  }
+
+  // For invoices, check subscription metadata or lines
+  if (data.subscription && typeof data.subscription === 'object') {
+    return data.subscription.metadata?.product_id;
+  }
+
+  return undefined;
+}
+
+/**
  * Route Stripe event to appropriate handler
  *
  * Supported event types:
@@ -151,6 +189,25 @@ export const handler: APIGatewayProxyHandler = async (event): Promise<APIGateway
  * @param stripeEvent - Verified Stripe event
  */
 async function routeEvent(client: any, stripeEvent: any): Promise<void> {
+  // Extract and validate product_id
+  const productId = extractProductId(stripeEvent);
+
+  // Check if this product belongs to us
+  const isAllowed = await isAllowedProduct(client, productId);
+  if (!isAllowed) {
+    console.log('[WebhookHandler] Skipping event - product not in our database', {
+      eventType: stripeEvent.type,
+      eventId: stripeEvent.id,
+      productId: productId || 'not found',
+    });
+    return;
+  }
+
+  console.log('[WebhookHandler] Processing event for product', {
+    eventType: stripeEvent.type,
+    productId,
+  });
+
   switch (stripeEvent.type) {
     case 'checkout.session.completed':
       await handleCheckoutCompleted(client, stripeEvent.data.object);
