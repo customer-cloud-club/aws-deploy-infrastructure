@@ -7,7 +7,7 @@ import type { PlatformConfig, AuthUser, Entitlement, Plan, UsageRecord, Checkout
 import { initAuth, requireAuth, logout, getAuthState, setAuthTokens, handleAuthCallback, getAccessToken, getIdToken, requestPasswordReset, confirmPasswordReset, deleteAccount, login, signup, confirmSignup, type LoginResponse, type SignupResponse } from './auth';
 import { initEntitlement, getEntitlement, hasFeature, checkLimit, getPlans, clearEntitlementCache } from './entitlement';
 import { initUsage, recordUsage, recordUsageBatch, incrementUsage } from './usage';
-import { initBilling, createCheckout, redirectToCheckout } from './billing';
+import { initBilling, createCheckout, redirectToCheckout, cancelSubscription } from './billing';
 
 export * from './types';
 export type { LoginResponse, SignupResponse } from './auth';
@@ -246,6 +246,16 @@ export class PlatformSDK {
    * ```
    */
   static redirectToCheckout = redirectToCheckout;
+
+  /**
+   * サブスクリプションをキャンセル（期間終了時に解約）
+   * @example
+   * ```typescript
+   * const result = await PlatformSDK.cancelSubscription('料金が高い', 'フィードバック');
+   * console.log(result.cancel_at); // キャンセル予定日
+   * ```
+   */
+  static cancelSubscription = cancelSubscription;
 }
 
 // デフォルトエクスポート

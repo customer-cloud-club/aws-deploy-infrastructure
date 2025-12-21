@@ -88,3 +88,52 @@ export async function redirectToCheckout(request: CheckoutRequest): Promise<void
     window.location.href = url;
   }
 }
+
+/**
+ * サブスクリプションをキャンセル（期間終了時に解約）
+ *
+ * @example
+ * ```typescript
+ * const result = await PlatformSDK.cancelSubscription('料金が高い', 'もっと安くして');
+ * console.log(result.cancel_at); // キャンセル予定日
+ * ```
+ */
+export async function cancelSubscription(
+  reason?: string,
+  feedback?: string
+): Promise<{ success: boolean; message: string; cancel_at?: string }> {
+  if (!config) {
+    throw new Error('PlatformSDK not initialized');
+  }
+
+  const token = await getIdToken();
+  if (!token) {
+    throw new Error('Not authenticated');
+  }
+
+  const response = await fetch(`${config.apiUrl}/subscriptions/cancel`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      product_id: config.productId,
+      reason,
+      feedback,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw {
+      name: 'PlatformError',
+      message: error.message || 'Failed to cancel subscription',
+      code: error.code || 'CANCEL_ERROR',
+      statusCode: response.status,
+      details: error.details,
+    } as PlatformError;
+  }
+
+  return response.json();
+}
