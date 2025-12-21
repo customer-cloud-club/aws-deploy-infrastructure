@@ -91,7 +91,7 @@ async function cancelSubscription(
       canceled_at = $1,
       updated_at = NOW()
     WHERE stripe_subscription_id = $2
-    RETURNING id, user_id, product_id
+    RETURNING id, user_id, plan_id
     `,
     [endedAt, subscription.id]
   );
@@ -108,7 +108,7 @@ async function cancelSubscription(
   console.log('[SubscriptionDeleted] Subscription marked as canceled', {
     subscriptionId: subscription.id,
     userId: subscriptionRecord.user_id,
-    productId: subscriptionRecord.product_id,
+    planId: subscriptionRecord.plan_id,
     canceledAt: endedAt.toISOString(),
   });
 }
@@ -126,12 +126,13 @@ async function revokeAccess(
   subscriptionId: string
 ): Promise<void> {
   try {
-    // Get subscription details for access revocation
+    // Get subscription details with product_id from plans table
     const result = await client.query(
       `
-      SELECT id, product_id
-      FROM subscriptions
-      WHERE stripe_subscription_id = $1
+      SELECT s.id, s.plan_id, p.product_id
+      FROM subscriptions s
+      LEFT JOIN plans p ON s.plan_id = p.id
+      WHERE s.stripe_subscription_id = $1
       `,
       [subscriptionId]
     );
@@ -141,44 +142,32 @@ async function revokeAccess(
       return;
     }
 
-    const { id: internalSubId, product_id: productId } = result.rows[0];
+    const { id: internalSubId, plan_id: planId, product_id: productId } = result.rows[0];
 
-    // TODO: Integrate with entitlement service
-    // Option 1: Direct API call to entitlement service
-    // await entitlementService.revokeAccess(userId, productId);
+    // Update entitlements to revoked status
+    if (productId) {
+      await client.query(
+        `
+        UPDATE entitlements
+        SET status = 'revoked', updated_at = NOW()
+        WHERE user_id = $1 AND product_id = $2 AND subscription_id = $3
+        `,
+        [userId, productId, internalSubId]
+      );
+    }
 
-    // Option 2: Publish event to message queue/SNS
-    // await publishEvent('subscription.access.revoked', { userId, productId, subscriptionId });
-
-    // For now, log the access revocation
-    console.log('[SubscriptionDeleted] Access revocation required', {
+    console.log('[SubscriptionDeleted] Access revoked', {
       userId,
       productId,
+      planId,
       subscriptionId: internalSubId,
       stripeSubscriptionId: subscriptionId,
       action: 'REVOKE_ACCESS',
     });
 
-    // Optional: Create access revocation record
-    await client.query(
-      `
-      INSERT INTO access_revocations (
-        user_id,
-        subscription_id,
-        product_id,
-        revoked_at,
-        created_at
-      )
-      VALUES ($1, $2, $3, NOW(), NOW())
-      ON CONFLICT (subscription_id) DO NOTHING
-      `,
-      [userId, internalSubId, productId]
-    );
-
   } catch (error) {
     console.error('[SubscriptionDeleted] Error revoking access:', error);
     // Don't throw - we still want to mark subscription as canceled
-    // Log error for manual intervention if needed
     console.error('[SubscriptionDeleted] Manual access revocation may be required', {
       userId,
       subscriptionId,

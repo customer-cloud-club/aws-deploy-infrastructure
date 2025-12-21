@@ -260,20 +260,32 @@ async function createOrUpdateEntitlement(
 
   const productId = planResult.rows[0].product_id;
 
-  // Upsert entitlement
-  await client.query(
-    `
-    INSERT INTO entitlements (user_id, product_id, plan_id, subscription_id, status)
-    VALUES ($1, $2, $3, $4, 'active')
-    ON CONFLICT (user_id, product_id) WHERE status = 'active'
-    DO UPDATE SET
-      plan_id = $3,
-      subscription_id = $4,
-      status = 'active',
-      updated_at = NOW()
-    `,
-    [userId, productId, planId, subscriptionId]
+  // Check if active entitlement exists
+  const existingEntitlement = await client.query(
+    `SELECT entitlement_id FROM entitlements WHERE user_id = $1 AND product_id = $2 AND status = 'active'`,
+    [userId, productId]
   );
+
+  if (existingEntitlement.rows.length > 0) {
+    // Update existing entitlement
+    await client.query(
+      `
+      UPDATE entitlements
+      SET plan_id = $1, subscription_id = $2, updated_at = NOW()
+      WHERE user_id = $3 AND product_id = $4 AND status = 'active'
+      `,
+      [planId, subscriptionId, userId, productId]
+    );
+  } else {
+    // Insert new entitlement
+    await client.query(
+      `
+      INSERT INTO entitlements (user_id, product_id, plan_id, subscription_id, status)
+      VALUES ($1, $2, $3, $4, 'active')
+      `,
+      [userId, productId, planId, subscriptionId]
+    );
+  }
 
   console.log('[SubscriptionUpdated] Entitlement created/updated', {
     userId,

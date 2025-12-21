@@ -137,6 +137,28 @@ async function runMigrations() {
 
   // PostgreSQL 9.6+ supports ADD COLUMN IF NOT EXISTS
   const migrations = [
+    // Create processed_webhooks table for idempotency (must be first)
+    `CREATE TABLE IF NOT EXISTS processed_webhooks (
+      stripe_event_id VARCHAR(255) PRIMARY KEY,
+      event_type VARCHAR(100) NOT NULL,
+      processed_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )`,
+    'CREATE INDEX IF NOT EXISTS idx_processed_webhooks_type ON processed_webhooks(event_type)',
+    'CREATE INDEX IF NOT EXISTS idx_processed_webhooks_processed_at ON processed_webhooks(processed_at)',
+    // Create customers table for Stripe customer mapping
+    `CREATE TABLE IF NOT EXISTS customers (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      user_id VARCHAR(255) NOT NULL UNIQUE,
+      stripe_customer_id VARCHAR(255) NOT NULL UNIQUE,
+      email VARCHAR(255),
+      metadata JSONB DEFAULT '{}',
+      created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+    )`,
+    'CREATE INDEX IF NOT EXISTS idx_customers_user_id ON customers(user_id)',
+    'CREATE INDEX IF NOT EXISTS idx_customers_stripe_customer_id ON customers(stripe_customer_id)',
+    'CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email)',
     // Add deleted_at column to products
     'ALTER TABLE products ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP',
     'CREATE INDEX IF NOT EXISTS idx_products_deleted_at ON products(deleted_at)',
