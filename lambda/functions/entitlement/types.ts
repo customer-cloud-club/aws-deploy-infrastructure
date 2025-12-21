@@ -80,6 +80,10 @@ export interface EntitlementWithPlan extends EntitlementRow {
   plan_features?: Record<string, boolean>;
   /** Plan soft limit percentage (from plans table) */
   soft_limit_percent?: number;
+  /** Whether subscription is set to cancel at period end (from subscriptions table) */
+  cancel_at_period_end?: boolean;
+  /** Current period end date (from subscriptions table) */
+  current_period_end?: Date;
 }
 
 /**
@@ -124,6 +128,8 @@ export interface EntitlementResponse {
   over_limit?: boolean;
   /** Whether usage is over soft limit */
   over_soft_limit?: boolean;
+  /** Subscription cancellation scheduled date (ISO 8601) - only present if cancel_at_period_end is true */
+  cancel_at?: string;
 }
 
 /**

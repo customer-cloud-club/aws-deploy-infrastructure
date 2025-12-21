@@ -143,7 +143,7 @@ export const handler: APIGatewayProxyHandler = async (event): Promise<APIGateway
     const client = await pool.connect();
 
     try {
-      // Query entitlement with plan data (JOIN)
+      // Query entitlement with plan and subscription data (JOIN)
       const result = await client.query<EntitlementWithPlan>(
         `
         SELECT
@@ -165,9 +165,12 @@ export const handler: APIGatewayProxyHandler = async (event): Promise<APIGateway
           p.billing_period,
           p.metadata->>'usage_limit' as plan_limit,
           p.metadata->>'features' as plan_features,
-          p.metadata->>'soft_limit_percent' as soft_limit_percent
+          p.metadata->>'soft_limit_percent' as soft_limit_percent,
+          s.cancel_at_period_end,
+          s.current_period_end
         FROM entitlements e
         LEFT JOIN plans p ON e.plan_id = p.id
+        LEFT JOIN subscriptions s ON e.subscription_id = s.id
         WHERE e.user_id = $1 AND e.product_id = $2 AND e.status = 'active'
         LIMIT 1
         `,
@@ -225,6 +228,10 @@ export const handler: APIGatewayProxyHandler = async (event): Promise<APIGateway
         valid_until: row.valid_until?.toISOString() || '',
         over_limit: usageCount > usageLimit,
         over_soft_limit: usageCount > softLimit,
+        // Include cancel_at only if subscription is scheduled to cancel
+        ...(row.cancel_at_period_end && row.current_period_end
+          ? { cancel_at: row.current_period_end.toISOString() }
+          : {}),
       };
 
       // Cache the response (60 seconds TTL)
