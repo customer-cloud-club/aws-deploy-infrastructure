@@ -54,6 +54,8 @@ export interface Entitlement {
   currentUsage: CurrentUsage;
   /** 有効期限 */
   expiresAt?: string;
+  /** 解約予定日 (ISO 8601) - cancel_at_period_end=trueの場合のみ */
+  cancelAt?: string;
 }
 
 /**
