@@ -89,8 +89,8 @@ export interface CreateProductRequest {
   name: string;
   /** Product description */
   description?: string;
-  /** Stripe Product ID */
-  stripe_product_id: string;
+  /** Stripe Product ID (optional - auto-created if not provided) */
+  stripe_product_id?: string;
   /** Whether the product is active */
   is_active?: boolean;
   /** Additional metadata */

@@ -6,6 +6,7 @@
 import { APIGatewayProxyResult } from 'aws-lambda';
 import { query, transaction } from '../../shared/db/index.js';
 import { setCacheValue, getCacheValue, deleteCachePattern } from '../../shared/utils/redis.js';
+import { getStripeClient } from '../billing/stripe.js';
 import {
   ProductRow,
   ProductResponse,
@@ -204,26 +205,46 @@ export async function listProducts(
 /**
  * POST /admin/products
  * Create a new product
+ * If stripe_product_id is not provided, automatically creates a Stripe product
  */
 export async function createProduct(body: string): Promise<APIGatewayProxyResult> {
   try {
     const request: CreateProductRequest = JSON.parse(body);
 
     // Validate required fields
-    if (!request.name || !request.stripe_product_id) {
+    if (!request.name) {
       return {
         statusCode: 400,
         body: JSON.stringify({
           error: 'Bad Request',
-          message: 'Missing required fields: name, stripe_product_id',
+          message: 'Missing required field: name',
         }),
       };
+    }
+
+    let stripeProductId = request.stripe_product_id;
+
+    // If stripe_product_id is not provided, create a Stripe product
+    if (!stripeProductId) {
+      console.log('[Products] Creating Stripe product:', request.name);
+      const stripe = await getStripeClient();
+      const stripeProduct = await stripe.products.create({
+        name: request.name,
+        description: request.description || undefined,
+        active: request.is_active ?? true,
+        metadata: {
+          source: 'admin-api',
+          ...(request.metadata as Record<string, string> || {}),
+        },
+      });
+      stripeProductId = stripeProduct.id;
+      console.log('[Products] Stripe product created:', stripeProductId);
     }
 
     // Check if stripe_product_id already exists
     const existingResult = await query<ProductRow>(
       'SELECT id FROM products WHERE stripe_product_id = $1 AND deleted_at IS NULL',
-      [request.stripe_product_id]
+      [stripeProductId]
     );
 
     if (existingResult.rows.length > 0) {
@@ -244,7 +265,7 @@ export async function createProduct(body: string): Promise<APIGatewayProxyResult
       [
         request.name,
         request.description || null,
-        request.stripe_product_id,
+        stripeProductId,
         request.is_active ?? true,
         JSON.stringify(request.metadata || {}),
       ]
