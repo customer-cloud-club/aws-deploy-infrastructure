@@ -430,6 +430,20 @@ export async function deleteProduct(productId: string): Promise<APIGatewayProxyR
       };
     }
 
+    // Archive Stripe Product
+    if (result.stripe_product_id) {
+      try {
+        const stripe = await getStripeClient();
+        await stripe.products.update(result.stripe_product_id, {
+          active: false,
+        });
+        console.log('[Products] Stripe Product archived:', result.stripe_product_id);
+      } catch (stripeError) {
+        console.warn('[Products] Failed to archive Stripe Product:', stripeError);
+        // Continue anyway - DB deletion was successful
+      }
+    }
+
     // Invalidate cache
     await invalidateProductCache(productId);
 
