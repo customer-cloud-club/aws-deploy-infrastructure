@@ -100,8 +100,8 @@ export default function ProductsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.stripe_product_id) {
-      alert('プロダクト名とStripe Product IDは必須です');
+    if (!form.name) {
+      alert('プロダクト名は必須です');
       return;
     }
 
@@ -116,10 +116,11 @@ export default function ProductsPage() {
         });
       } else {
         // Create new product
+        // stripe_product_id is optional - if not provided, API will auto-create Stripe product
         await apiClient.post('/admin/products', {
           name: form.name,
           description: form.description || null,
-          stripe_product_id: form.stripe_product_id,
+          ...(form.stripe_product_id ? { stripe_product_id: form.stripe_product_id } : {}),
           is_active: form.is_active,
         });
       }
@@ -297,20 +298,19 @@ export default function ProductsPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">
-                    Stripe Product ID <span className="text-red-500">*</span>
+                    Stripe Product ID
                   </label>
                   <Input
                     type="text"
                     value={form.stripe_product_id}
                     onChange={(e) => setForm({ ...form, stripe_product_id: e.target.value })}
                     placeholder="例: prod_xxxxxxxxxxxxx"
-                    required
                     disabled={!!editingProduct}
                   />
                   <p className="text-xs text-muted-foreground mt-1">
                     {editingProduct
                       ? 'Stripe Product IDは変更できません'
-                      : 'Stripeダッシュボードで作成したProduct ID'}
+                      : '空欄の場合、Stripeに自動で商品が作成されます'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
