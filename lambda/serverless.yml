@@ -128,6 +128,20 @@ functions:
             type: COGNITO_USER_POOLS
             authorizerId: !Ref ApiGatewayAuthorizer
 
+  # User profile
+  userProfile:
+    handler: dist/functions/auth/me/handler.handler
+    memorySize: 256
+    timeout: 30
+    events:
+      - http:
+          path: me
+          method: get
+          cors: true
+          authorizer:
+            type: COGNITO_USER_POOLS
+            authorizerId: !Ref ApiGatewayAuthorizer
+
   # Entitlement check
   entitlementCheck:
     handler: dist/functions/entitlement/check/handler.handler

@@ -3,11 +3,12 @@
  * Platform SDK for AI Dreams Factory authentication and billing integration
  */
 
-import type { PlatformConfig, AuthUser, Entitlement, Plan, UsageRecord, CheckoutRequest, CheckoutSession } from './types';
+import type { PlatformConfig, AuthUser, Entitlement, Plan, UsageRecord, CheckoutRequest, CheckoutSession, UserProfile } from './types';
 import { initAuth, requireAuth, logout, getAuthState, setAuthTokens, handleAuthCallback, getAccessToken, getIdToken, requestPasswordReset, confirmPasswordReset, deleteAccount, login, signup, confirmSignup, type LoginResponse, type SignupResponse } from './auth';
 import { initEntitlement, getEntitlement, hasFeature, checkLimit, getPlans, clearEntitlementCache } from './entitlement';
 import { initUsage, recordUsage, recordUsageBatch, incrementUsage } from './usage';
 import { initBilling, createCheckout, redirectToCheckout, cancelSubscription } from './billing';
+import { initProfile, getMe } from './profile';
 
 export * from './types';
 export type { LoginResponse, SignupResponse } from './auth';
@@ -39,6 +40,7 @@ export class PlatformSDK {
     initEntitlement(config);
     initUsage(config);
     initBilling(config);
+    initProfile(config);
     this.initialized = true;
   }
 
@@ -63,6 +65,17 @@ export class PlatformSDK {
    * 現在の認証状態を取得（リダイレクトなし）
    */
   static getAuthState = getAuthState;
+
+  /**
+   * 現在のユーザープロフィールを取得
+   * @example
+   * ```typescript
+   * const profile = await PlatformSDK.getMe();
+   * console.log(profile.email);
+   * console.log(profile.auth_provider); // 'cognito' or 'google'
+   * ```
+   */
+  static getMe = getMe;
 
   /**
    * アクセストークンを取得

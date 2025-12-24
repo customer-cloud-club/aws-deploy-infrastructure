@@ -153,6 +153,32 @@ export interface CheckoutSession {
 }
 
 /**
+ * ユーザープロフィール
+ */
+export interface UserProfile {
+  /** ユーザーID (Cognito sub) */
+  user_id: string;
+  /** メールアドレス */
+  email: string;
+  /** 表示名 */
+  name: string | null;
+  /** メール確認済みフラグ */
+  email_verified: boolean;
+  /** テナントID */
+  tenant_id: string | null;
+  /** プランID */
+  plan_id: string | null;
+  /** ユーザーロール */
+  role: string | null;
+  /** 認証プロバイダー (cognito, google等) */
+  auth_provider: string;
+  /** Stripe顧客ID */
+  stripe_customer_id: string | null;
+  /** アカウント作成日時 */
+  created_at: string | null;
+}
+
+/**
  * APIエラー
  */
 export class PlatformError extends Error {
