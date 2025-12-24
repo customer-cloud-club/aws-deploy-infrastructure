@@ -30,15 +30,16 @@ export async function recordUsage(amount: number, type: string = 'api_call', met
     metadata,
   };
 
-  const response = await fetch(`${config.apiUrl}/entitlements/usage`, {
+  const response = await fetch(`${config.apiUrl}/me/usage`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      productId: config.productId,
-      ...record,
+      product_id: config.productId,
+      count: amount,
+      metadata,
     }),
   });
 
@@ -53,35 +54,17 @@ export async function recordUsage(amount: number, type: string = 'api_call', met
 
 /**
  * バッチで使用量を記録
+ * 内部的には個別のAPIコールを順次実行します
  */
 export async function recordUsageBatch(records: UsageRecord[]): Promise<void> {
   if (!config) {
     throw new Error('PlatformSDK not initialized');
   }
 
-  const token = await getIdToken();
-  if (!token) {
-    throw new Error('Not authenticated');
+  // 各レコードを順次処理
+  for (const record of records) {
+    await recordUsage(record.amount, record.type, record.metadata);
   }
-
-  const response = await fetch(`${config.apiUrl}/entitlements/usage/batch`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      productId: config.productId,
-      records,
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Failed to record usage batch');
-  }
-
-  clearEntitlementCache();
 }
 
 /**
