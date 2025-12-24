@@ -182,6 +182,7 @@ function extractProductId(stripeEvent: any): string | undefined {
  * Supported event types:
  * - checkout.session.completed: Customer completes checkout
  * - invoice.paid: Subscription payment succeeds
+ * - customer.subscription.created: New subscription created
  * - customer.subscription.updated: Subscription details change
  * - customer.subscription.deleted: Subscription is canceled
  *
@@ -215,6 +216,11 @@ async function routeEvent(client: any, stripeEvent: any): Promise<void> {
 
     case 'invoice.paid':
       await handleInvoicePaid(client, stripeEvent.data.object);
+      break;
+
+    case 'customer.subscription.created':
+      // Treat created the same as updated - creates entitlement
+      await handleSubscriptionUpdated(client, stripeEvent.data.object);
       break;
 
     case 'customer.subscription.updated':
