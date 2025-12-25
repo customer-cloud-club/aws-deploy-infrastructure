@@ -31,7 +31,14 @@
 
 ## 管理画面でのセットアップ
 
-管理画面URL: `https://admin.your-domain.com`
+### 環境別URL
+
+| 環境 | 管理画面URL | API URL |
+|------|------------|---------|
+| **本番環境** | https://admin.aidreams-factory.com | https://cc-auth.aidreams-factory.com |
+| **開発環境** | https://admin-dev.aidreams-factory.com | https://cc-auth-dev.aidreams-factory.com |
+
+> **注意**: 開発・テスト時は開発環境を使用してください。本番環境は実際のサービス運用時に使用します。
 
 ### 1. プロダクト作成
 
@@ -115,10 +122,16 @@
 
 管理画面から以下の情報を取得してください：
 
-| 項目 | 取得場所 | 例 |
-|------|---------|-----|
-| Product ID | プロダクト一覧 | `2199b3fb-daf7-4d82-b77f-f112f4fa4a31` |
-| API URL | 固定値 | `https://9sdlempnx9.execute-api.ap-northeast-1.amazonaws.com/prod` |
+| 項目 | 取得場所 | 説明 |
+|------|---------|------|
+| Product ID | 管理画面 > プロダクト一覧 | 例: `2199b3fb-daf7-4d82-b77f-f112f4fa4a31` |
+
+### 環境別API URL
+
+| 環境 | API URL | 用途 |
+|------|---------|------|
+| **本番環境** | `https://cc-auth.aidreams-factory.com` | 本番サービス運用時 |
+| **開発環境** | `https://cc-auth-dev.aidreams-factory.com` | 開発・テスト時 |
 
 ### SDK バージョン
 
@@ -139,7 +152,8 @@
 
 ## 設定情報
 - Product ID: [管理画面で確認したID]
-- API URL: https://9sdlempnx9.execute-api.ap-northeast-1.amazonaws.com/prod
+- API URL: https://cc-auth.aidreams-factory.com  # 本番環境
+# - API URL: https://cc-auth-dev.aidreams-factory.com  # 開発環境
 
 ## 必要な機能
 1. ログイン画面（メール/パスワード）
@@ -165,7 +179,8 @@
 
 ## 設定情報
 - Product ID: [管理画面で確認したID]
-- API URL: https://9sdlempnx9.execute-api.ap-northeast-1.amazonaws.com/prod
+- API URL: https://cc-auth.aidreams-factory.com  # 本番環境
+# - API URL: https://cc-auth-dev.aidreams-factory.com  # 開発環境
 
 ## 必要な機能
 1. プラン選択画面
@@ -199,7 +214,8 @@ console.log(entitlement.planName);  // "Pro" など
 
 ## 設定情報
 - Product ID: [管理画面で確認したID]
-- API URL: https://9sdlempnx9.execute-api.ap-northeast-1.amazonaws.com/prod
+- API URL: https://cc-auth.aidreams-factory.com  # 本番環境
+# - API URL: https://cc-auth-dev.aidreams-factory.com  # 開発環境
 
 ## 必要な機能
 1. API呼び出し時に使用回数をカウント
@@ -237,7 +253,8 @@ if (await PlatformSDK.hasFeature('pro_feature')) {
 
 ## 設定情報
 - Product ID: [管理画面で確認したID]
-- API URL: https://9sdlempnx9.execute-api.ap-northeast-1.amazonaws.com/prod
+- API URL: https://cc-auth.aidreams-factory.com  # 本番環境
+# - API URL: https://cc-auth-dev.aidreams-factory.com  # 開発環境
 
 ## 必要な機能
 
@@ -266,10 +283,17 @@ if (await PlatformSDK.hasFeature('pro_feature')) {
 
 import { PlatformSDK } from '@customer-cloud-club/platform-sdk';
 
+// 本番環境
 PlatformSDK.init({
   productId: '[管理画面で確認したID]',
-  apiUrl: 'https://9sdlempnx9.execute-api.ap-northeast-1.amazonaws.com/prod',
+  apiUrl: 'https://cc-auth.aidreams-factory.com',
 });
+
+// 開発環境（テスト時はこちらを使用）
+// PlatformSDK.init({
+//   productId: '[管理画面で確認したID]',
+//   apiUrl: 'https://cc-auth-dev.aidreams-factory.com',
+// });
 
 ## 主要なSDKメソッド
 
@@ -351,8 +375,14 @@ GitHub の Settings > Developer settings > Personal access tokens で作成で�
 
 ### Q: テスト環境で試したい
 
-開発環境の API URL を使用してください：
-`https://wqqr3nryw0.execute-api.ap-northeast-1.amazonaws.com/dev`
+開発環境を使用してください：
+
+| 項目 | URL |
+|------|-----|
+| 管理画面 | https://admin-dev.aidreams-factory.com |
+| API URL | https://cc-auth-dev.aidreams-factory.com |
+
+開発環境では本番データに影響を与えずにテストできます。
 
 ---
 
