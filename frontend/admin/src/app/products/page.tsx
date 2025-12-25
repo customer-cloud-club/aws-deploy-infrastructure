@@ -150,8 +150,18 @@ export default function ProductsPage() {
 
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (product.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
+    (product.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
+    product.id.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      alert('コピーしました');
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -207,6 +217,7 @@ export default function ProductsPage() {
                 <thead>
                   <tr className="border-b">
                     <th className="text-left py-3 px-4 font-medium">{t('products.fields.name')}</th>
+                    <th className="text-left py-3 px-4 font-medium">Product ID</th>
                     <th className="text-left py-3 px-4 font-medium">{t('products.fields.description')}</th>
                     <th className="text-left py-3 px-4 font-medium">Stripe Product ID</th>
                     <th className="text-left py-3 px-4 font-medium">{t('products.fields.status')}</th>
@@ -218,6 +229,22 @@ export default function ProductsPage() {
                   {filteredProducts.map((product) => (
                     <tr key={product.id} className="border-b hover:bg-accent/50 transition-colors">
                       <td className="py-3 px-4 font-medium">{product.name}</td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                            {product.id}
+                          </code>
+                          <button
+                            onClick={() => copyToClipboard(product.id)}
+                            className="text-muted-foreground hover:text-foreground transition-colors"
+                            title="コピー"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
                       <td className="py-3 px-4 text-muted-foreground">{product.description || '-'}</td>
                       <td className="py-3 px-4 font-mono text-sm">{product.stripe_product_id}</td>
                       <td className="py-3 px-4">

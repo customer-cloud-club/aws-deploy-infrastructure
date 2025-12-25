@@ -51,6 +51,14 @@ class ApiClient {
     });
 
     if (!response.ok) {
+      // Handle unauthorized/forbidden errors by redirecting to login
+      if (response.status === 401 || response.status === 403) {
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+          window.location.href = '/login';
+          throw new Error('Unauthorized');
+        }
+      }
+
       const error = await response.json().catch(() => ({
         message: response.statusText,
       }));

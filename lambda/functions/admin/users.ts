@@ -22,6 +22,7 @@ import {
   AdminAddUserToGroupCommand,
   AdminRemoveUserFromGroupCommand,
   AdminListGroupsForUserCommand,
+  AdminSetUserPasswordCommand,
   AttributeType,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { query } from '../../shared/db/index.js';
@@ -507,6 +508,66 @@ export async function getUserLogins(userId: string): Promise<APIGatewayProxyResu
       statusCode: 500,
       headers: corsHeaders,
       body: JSON.stringify({ error: 'Failed to get user logins' }),
+    };
+  }
+}
+
+/**
+ * Set user password
+ * POST /admin/users/{id}/password
+ */
+export async function setUserPassword(userId: string, body: string): Promise<APIGatewayProxyResult> {
+  try {
+    const { password, permanent = true } = JSON.parse(body);
+
+    if (!password) {
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: 'Password is required' }),
+      };
+    }
+
+    if (password.length < 8) {
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: 'Password must be at least 8 characters' }),
+      };
+    }
+
+    await cognitoClient.send(new AdminSetUserPasswordCommand({
+      UserPoolId: USER_POOL_ID,
+      Username: userId,
+      Password: password,
+      Permanent: permanent,
+    }));
+
+    return {
+      statusCode: 200,
+      headers: corsHeaders,
+      body: JSON.stringify({ success: true, message: 'Password updated successfully' }),
+    };
+  } catch (error: any) {
+    if (error.name === 'UserNotFoundException') {
+      return {
+        statusCode: 404,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: 'User not found' }),
+      };
+    }
+    if (error.name === 'InvalidPasswordException') {
+      return {
+        statusCode: 400,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: 'Password does not meet requirements. Must include uppercase, lowercase, number, and special character.' }),
+      };
+    }
+    console.error('[Users] Error setting user password:', error);
+    return {
+      statusCode: 500,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Failed to set user password' }),
     };
   }
 }

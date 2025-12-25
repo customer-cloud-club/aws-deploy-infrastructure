@@ -73,6 +73,7 @@ provider:
             - cognito-idp:AdminRemoveUserFromGroup
             - cognito-idp:AdminListGroupsForUser
             - cognito-idp:AdminDeleteUser
+            - cognito-idp:AdminSetUserPassword
           Resource: ${self:custom.env.cognito.userPoolArn}
 
 custom:

@@ -18,7 +18,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
   const { isLoading, isLoggedIn } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
-  const isLoginPage = pathname === '/login' || pathname === '/login/';
+  const isLoginPage = pathname === '/login' || pathname === '/login/' || pathname?.startsWith('/login/');
 
   useEffect(() => {
     if (!isLoading && !isLoggedIn && !isLoginPage) {

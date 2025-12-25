@@ -44,6 +44,7 @@ interface CreateUserRequest {
   email: string;
   name: string;
   role?: 'admin' | 'user';
+  temporaryPassword?: string;
 }
 
 export default function UsersPage() {
@@ -55,11 +56,14 @@ export default function UsersPage() {
   const [filterRole, setFilterRole] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createForm, setCreateForm] = useState<CreateUserRequest>({ email: '', name: '', role: 'user' });
+  const [createForm, setCreateForm] = useState<CreateUserRequest>({ email: '', name: '', role: 'user', temporaryPassword: '' });
   const [creating, setCreating] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [userLogins, setUserLogins] = useState<UserLoginHistory[]>([]);
   const [loadingLogins, setLoadingLogins] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ password: '', confirmPassword: '' });
+  const [settingPassword, setSettingPassword] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -105,9 +109,18 @@ export default function UsersPage() {
 
     try {
       setCreating(true);
-      await apiClient.post<User>('/admin/users', createForm);
+      // Build request - only include temporaryPassword if provided
+      const requestBody: CreateUserRequest = {
+        email: createForm.email,
+        name: createForm.name,
+        role: createForm.role,
+      };
+      if (createForm.temporaryPassword) {
+        requestBody.temporaryPassword = createForm.temporaryPassword;
+      }
+      await apiClient.post<User>('/admin/users', requestBody);
       setShowCreateModal(false);
-      setCreateForm({ email: '', name: '', role: 'user' });
+      setCreateForm({ email: '', name: '', role: 'user', temporaryPassword: '' });
       await fetchUsers();
     } catch (err) {
       console.error('Failed to create user:', err);
@@ -154,6 +167,41 @@ export default function UsersPage() {
       console.error('Failed to fetch user logins:', err);
     } finally {
       setLoadingLogins(false);
+    }
+  };
+
+  const handleOpenPasswordModal = (user: User) => {
+    setSelectedUser(user);
+    setPasswordForm({ password: '', confirmPassword: '' });
+    setShowPasswordModal(true);
+  };
+
+  const handleSetPassword = async () => {
+    if (!selectedUser) return;
+
+    if (passwordForm.password !== passwordForm.confirmPassword) {
+      alert('パスワードが一致しません');
+      return;
+    }
+
+    if (passwordForm.password.length < 8) {
+      alert('パスワードは8文字以上必要です');
+      return;
+    }
+
+    try {
+      setSettingPassword(true);
+      await apiClient.post(`/admin/users/${encodeURIComponent(selectedUser.id)}/password`, {
+        password: passwordForm.password,
+      });
+      alert('パスワードを更新しました');
+      setShowPasswordModal(false);
+      setPasswordForm({ password: '', confirmPassword: '' });
+    } catch (err) {
+      console.error('Failed to set password:', err);
+      alert(err instanceof Error ? err.message : 'パスワードの更新に失敗しました');
+    } finally {
+      setSettingPassword(false);
     }
   };
 
@@ -318,6 +366,9 @@ export default function UsersPage() {
                       <td className="py-3 px-4 text-muted-foreground">{formatDate(user.lastLogin)}</td>
                       <td className="py-3 px-4">
                         <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                          <Button variant="ghost" size="sm" onClick={() => handleOpenPasswordModal(user)}>
+                            PW変更
+                          </Button>
                           <Button variant="ghost" size="sm" onClick={() => handleToggleStatus(user)}>
                             {user.status === 'active' ? 'Disable' : 'Enable'}
                           </Button>
@@ -412,6 +463,18 @@ export default function UsersPage() {
                   <option value="user">User</option>
                   <option value="admin">Admin</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">パスワード</label>
+                <Input
+                  type="password"
+                  value={createForm.temporaryPassword || ''}
+                  onChange={(e) => setCreateForm({ ...createForm, temporaryPassword: e.target.value })}
+                  placeholder="空欄の場合は自動生成してメール送信"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  入力すると指定したパスワードで作成（メール通知なし）
+                </p>
               </div>
               <div className="flex gap-3 justify-end mt-6">
                 <Button variant="secondary" onClick={() => setShowCreateModal(false)}>
@@ -526,6 +589,53 @@ export default function UsersPage() {
               <Button variant="secondary" onClick={() => setSelectedUser(null)}>
                 Close
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Password Change Modal */}
+      {showPasswordModal && selectedUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-background rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">パスワード変更</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              {selectedUser.email} のパスワードを変更
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">新しいパスワード *</label>
+                <Input
+                  type="password"
+                  value={passwordForm.password}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, password: e.target.value })}
+                  placeholder="8文字以上"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">パスワード確認 *</label>
+                <Input
+                  type="password"
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                  placeholder="もう一度入力"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                大文字・小文字・数字・記号を含む8文字以上
+              </p>
+              <div className="flex gap-3 justify-end mt-6">
+                <Button variant="secondary" onClick={() => setShowPasswordModal(false)}>
+                  キャンセル
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleSetPassword}
+                  disabled={settingPassword || !passwordForm.password || !passwordForm.confirmPassword}
+                >
+                  {settingPassword ? '更新中...' : '更新'}
+                </Button>
+              </div>
             </div>
           </div>
         </div>

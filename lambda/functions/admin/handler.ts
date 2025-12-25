@@ -18,7 +18,7 @@
 
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { getDashboardStats, getRevenueData, getUserGrowthData, getRecentActivity } from './dashboard.js';
-import { listUsers, getUser, createUser, updateUser, deleteUser } from './users.js';
+import { listUsers, getUser, createUser, updateUser, deleteUser, getUserLogins, setUserPassword } from './users.js';
 
 const corsHeaders = {
   'Content-Type': 'application/json',
@@ -71,6 +71,20 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     if (path === '/admin/users' && method === 'POST') {
       return await createUser(event.body || '{}');
+    }
+
+    // User logins route
+    const loginsMatch = path.match(/^\/admin\/users\/([^/]+)\/logins$/);
+    if (loginsMatch && method === 'GET') {
+      const userId = decodeURIComponent(loginsMatch[1]);
+      return await getUserLogins(userId);
+    }
+
+    // User password route
+    const passwordMatch = path.match(/^\/admin\/users\/([^/]+)\/password$/);
+    if (passwordMatch && method === 'POST') {
+      const userId = decodeURIComponent(passwordMatch[1]);
+      return await setUserPassword(userId, event.body || '{}');
     }
 
     // Single user routes with ID

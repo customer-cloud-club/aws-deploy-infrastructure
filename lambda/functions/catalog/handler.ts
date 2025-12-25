@@ -53,7 +53,7 @@ import { getPlan, listPlans, createPlan, updatePlan, deletePlan } from './plans.
 import { getTenant, listTenants, createTenant } from './tenants.js';
 import { getCoupon, listCoupons, createCoupon, updateCoupon, deleteCoupon, getPromotionCode, listPromotionCodes, createPromotionCode, deletePromotionCode } from './coupons.js';
 import { getDashboardStats, getRevenueData, getUserGrowthData, getRecentActivity } from '../admin/dashboard.js';
-import { listUsers, getUser, createUser, updateUser, deleteUser, getUserLogins } from '../admin/users.js';
+import { listUsers, getUser, createUser, updateUser, deleteUser, getUserLogins, setUserPassword } from '../admin/users.js';
 import { AdminCheckResult } from './types.js';
 
 /**
@@ -538,6 +538,10 @@ async function handleUsersRoute(
             message: 'Request body required',
           }),
         };
+      }
+      // POST /admin/users/{id}/password
+      if (resourceId && subRoute === 'password') {
+        return setUserPassword(resourceId, body);
       }
       // POST /admin/users
       return createUser(body);
